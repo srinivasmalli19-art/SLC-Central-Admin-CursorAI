@@ -16,6 +16,8 @@ import {
   type RoleKey,
 } from '@slc/shared';
 
+import { seedApplications } from './seedApplications.js';
+
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
@@ -51,11 +53,17 @@ async function main(): Promise<void> {
     });
   }
 
-  const [roleCount, permissionCount] = await Promise.all([
+  // Application registry (Phase 3) — idempotent, Phase 0 facts only.
+  await seedApplications(prisma);
+
+  const [roleCount, permissionCount, appCount] = await Promise.all([
     prisma.role.count(),
     prisma.permission.count(),
+    prisma.application.count(),
   ]);
-  console.log(`Seeded ${roleCount} roles and ${permissionCount} permissions.`);
+  console.log(
+    `Seeded ${roleCount} roles, ${permissionCount} permissions and ${appCount} applications.`,
+  );
 }
 
 main()
