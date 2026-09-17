@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { healthRouter } from '../modules/health/health.routes.js';
 import { authRouter } from '../modules/auth/auth.routes.js';
 import { adminUsersRouter } from '../modules/admin-users/adminUsers.routes.js';
+import { applicationsRouter } from '../modules/applications/applications.routes.js';
 
 /**
  * Versioned API router (`/api/v1`).
@@ -15,3 +16,4 @@ export const v1Router = Router();
 v1Router.use('/', healthRouter);
 v1Router.use('/', authRouter);
 v1Router.use('/', adminUsersRouter);
+v1Router.use('/', applicationsRouter);
