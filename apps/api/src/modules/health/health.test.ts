@@ -22,9 +22,14 @@ describe('application startup + health endpoint', () => {
     expect(data.environment).toBe('test');
     expect(typeof data.timestamp).toBe('string');
     expect(Number.isFinite(data.uptimeSeconds)).toBe(true);
-    // No database configured in tests -> reported honestly, service degraded.
-    expect(data.dependencies.database).toBe('disconnected');
-    expect(data.status).toBe('degraded');
+    // Database connectivity is reported honestly; overall status must be
+    // consistent with it regardless of whether a test DB is configured.
+    expect(['connected', 'disconnected', 'unknown']).toContain(data.dependencies.database);
+    if (data.dependencies.database === 'connected') {
+      expect(data.status).toBe('ok');
+    } else {
+      expect(data.status).toBe('degraded');
+    }
   });
 
   it('sets secure headers via helmet', async () => {
