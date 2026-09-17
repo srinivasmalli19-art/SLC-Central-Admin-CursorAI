@@ -27,6 +27,18 @@ export function getPrisma(): PrismaClient | undefined {
 }
 
 /**
+ * Return the Prisma client or throw if no database is configured. Used by
+ * features (auth, RBAC) that cannot function without persistence.
+ */
+export function requirePrisma(): PrismaClient {
+  const prisma = getPrisma();
+  if (!prisma) {
+    throw new Error('DATABASE_URL is not configured; a database is required for this operation.');
+  }
+  return prisma;
+}
+
+/**
  * Lightweight connectivity probe used by the health endpoint.
  * Returns true only when a trivial query succeeds.
  */
