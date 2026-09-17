@@ -1,4 +1,13 @@
-import type { CurrentUser, HealthResponse } from '@slc/shared';
+import type {
+  Application,
+  ApplicationListQuery,
+  ApplicationStats,
+  CreateApplicationInput,
+  CurrentUser,
+  HealthResponse,
+  PaginatedResult,
+  UpdateApplicationInput,
+} from '@slc/shared';
 
 /**
  * API client for the web shell.
@@ -94,4 +103,28 @@ export const authApi = {
     api.post<{ user: CurrentUser; csrfToken: string }>('/auth/login', { email, password }),
   logout: () => api.post<{ loggedOut: boolean }>('/auth/logout'),
   me: () => api.get<{ user: CurrentUser | null }>('/auth/me'),
+};
+
+function toQueryString(query: Record<string, unknown>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== '') {
+      params.set(key, String(value));
+    }
+  }
+  const s = params.toString();
+  return s ? `?${s}` : '';
+}
+
+export const applicationsApi = {
+  list: (query: ApplicationListQuery = {}) =>
+    api.get<PaginatedResult<Application>>(
+      `/applications${toQueryString(query as Record<string, unknown>)}`,
+    ),
+  get: (id: string) => api.get<{ application: Application }>(`/applications/${id}`),
+  create: (input: CreateApplicationInput) =>
+    api.post<{ application: Application }>('/applications', input),
+  update: (id: string, input: UpdateApplicationInput) =>
+    api.patch<{ application: Application }>(`/applications/${id}`, input),
+  stats: () => api.get<{ stats: ApplicationStats }>('/applications-stats'),
 };

@@ -8,6 +8,9 @@ import { RequirePermission } from './auth/RequirePermission';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { NotFound } from './pages/NotFound';
+import { ApplicationsList } from './pages/applications/ApplicationsList';
+import { ApplicationDetail } from './pages/applications/ApplicationDetail';
+import { ApplicationForm } from './pages/applications/ApplicationForm';
 
 /**
  * Application routing.
@@ -27,6 +30,40 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<Dashboard />} />
+
+          <Route
+            path="applications"
+            element={
+              <RequirePermission permission="applications.view">
+                <ApplicationsList />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="applications/new"
+            element={
+              <RequirePermission permission="applications.manage">
+                <ApplicationForm mode="create" />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="applications/:id"
+            element={
+              <RequirePermission permission="applications.view">
+                <ApplicationDetail />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="applications/:id/edit"
+            element={
+              <RequirePermission permission="applications.manage">
+                <ApplicationForm mode="edit" />
+              </RequirePermission>
+            }
+          />
+
           {placeholderModules.map((module) => {
             const element = <ComingSoon title={module.label} />;
             return (
