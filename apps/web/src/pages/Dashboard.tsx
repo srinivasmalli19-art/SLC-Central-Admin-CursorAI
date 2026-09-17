@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { HealthResponse } from '@slc/shared';
+import type { ApplicationStats, HealthResponse } from '@slc/shared';
 
-import { fetchHealth } from '../lib/api';
+import { applicationsApi, fetchHealth } from '../lib/api';
 import { ErrorState, LoadingState } from '../components/states';
 import { StatusBadge } from '../components/StatusBadge';
 
@@ -10,11 +10,17 @@ type LoadState =
   | { kind: 'error'; message: string }
   | { kind: 'ready'; health: HealthResponse };
 
+type StatsState =
+  | { kind: 'loading' }
+  | { kind: 'error' }
+  | { kind: 'ready'; stats: ApplicationStats };
+
 const serviceTone = { ok: 'ok', degraded: 'warn', down: 'down' } as const;
 const depTone = { connected: 'ok', disconnected: 'warn', unknown: 'muted' } as const;
 
 export function Dashboard() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
+  const [stats, setStats] = useState<StatsState>({ kind: 'loading' });
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -33,14 +39,70 @@ export function Dashboard() {
     };
   }, []);
 
+  const loadStats = useCallback(() => {
+    let cancelled = false;
+    setStats({ kind: 'loading' });
+    applicationsApi
+      .stats()
+      .then(({ stats: s }) => {
+        if (!cancelled) setStats({ kind: 'ready', stats: s });
+      })
+      .catch(() => {
+        if (!cancelled) setStats({ kind: 'error' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => load(), [load]);
+  useEffect(() => loadStats(), [loadStats]);
 
   return (
     <section className="page">
       <header className="page__header">
         <h1 className="page__title">Dashboard</h1>
-        <span className="badge badge--muted">Phase 1 · Foundation</span>
+        <span className="badge badge--muted">Registry</span>
       </header>
+
+      <div className="card">
+        <div className="card__header">
+          <h2 className="card__title">Application registry</h2>
+        </div>
+
+        {stats.kind === 'loading' && <LoadingState label="Loading registry statistics…" />}
+
+        {stats.kind === 'error' && (
+          <p className="muted">
+            <strong>DATA NOT CONNECTED</strong> — registry statistics are unavailable.
+          </p>
+        )}
+
+        {stats.kind === 'ready' && (
+          <dl className="stat-grid">
+            <div className="stat">
+              <dt>Total applications</dt>
+              <dd>{stats.stats.total}</dd>
+            </div>
+            <div className="stat">
+              <dt>Production</dt>
+              <dd>{stats.stats.production}</dd>
+            </div>
+            <div className="stat">
+              <dt>Development</dt>
+              <dd>{stats.stats.development}</dd>
+            </div>
+            <div className="stat">
+              <dt>Registry-only</dt>
+              <dd>{stats.stats.registryOnly}</dd>
+            </div>
+            <div className="stat">
+              <dt>Pending integrations</dt>
+              <dd>{stats.stats.pendingIntegrations}</dd>
+            </div>
+          </dl>
+        )}
+      </div>
 
       <div className="card">
         <div className="card__header">
@@ -49,9 +111,7 @@ export function Dashboard() {
 
         {state.kind === 'loading' && <LoadingState label="Checking API health…" />}
 
-        {state.kind === 'error' && (
-          <ErrorState message={state.message} onRetry={() => load()} />
-        )}
+        {state.kind === 'error' && <ErrorState message={state.message} onRetry={() => load()} />}
 
         {state.kind === 'ready' && (
           <dl className="stat-grid">
@@ -92,13 +152,10 @@ export function Dashboard() {
       </div>
 
       <div className="card card--placeholder">
-        <p>
-          Operational widgets (application counts, health, recent administrative activity,
-          alerts) arrive in later phases.
-        </p>
         <p className="muted">
-          Placeholders never show fabricated numbers. When an integration is not connected,
-          the platform will explicitly show <strong>DATA NOT CONNECTED</strong>.
+          Health monitoring and per-application status arrive in a later phase. Registry counts
+          above are derived from the central database; when unavailable the dashboard shows
+          <strong> DATA NOT CONNECTED</strong> rather than fabricated numbers.
         </p>
       </div>
     </section>
