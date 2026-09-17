@@ -118,6 +118,81 @@ model RolePermission {
   @@map("role_permission")
 }
 
+// ============================================================================
+// Application Registry (Phase 3)
+// ----------------------------------------------------------------------------
+// Central METADATA about ecosystem applications. This registry never stores
+// secrets and never mirrors external application business data. Unknown values
+// are stored as NULL (rendered as UNKNOWN in the UI).
+// ============================================================================
+
+enum AppStatus {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+  MAINTENANCE
+  DEPRECATED
+  UNKNOWN
+}
+
+enum DeploymentEnvironment {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+  UNKNOWN
+}
+
+enum IntegrationType {
+  API
+  FIREBASE_ADMIN
+  SUPABASE
+  REGISTRY_ONLY
+  PENDING
+  NONE
+}
+
+enum IntegrationStatus {
+  NOT_STARTED
+  PLANNED
+  CONFIGURED
+  TESTING
+  CONNECTED
+  DEGRADED
+  DISCONNECTED
+  NOT_APPLICABLE
+}
+
+/// A registered ecosystem application (metadata only). No secrets, no external
+/// business data, no credentials are ever stored here.
+model Application {
+  id                       String                @id @default(uuid())
+  slug                     String                @unique
+  name                     String
+  description              String?
+  platform                 String?
+  frontendTechnology       String?
+  backendTechnology        String?
+  databaseTechnology       String?
+  authenticationTechnology String?
+  repositoryUrl            String?
+  productionUrl            String?
+  stagingUrl               String?
+  environment              DeploymentEnvironment @default(UNKNOWN)
+  integrationType          IntegrationType       @default(NONE)
+  adapterType              String?
+  integrationStatus        IntegrationStatus     @default(NOT_STARTED)
+  status                   AppStatus             @default(UNKNOWN)
+  version                  String?
+  healthCheckEnabled       Boolean               @default(false)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+
+  @@index([status])
+  @@index([integrationType])
+  @@index([integrationStatus])
+  @@map("application")
+}
+
 /// A server-side session. The raw opaque token lives only in the client cookie;
 /// only its SHA-256 hash is stored here so logout/disable can truly invalidate.
 model AdminSession {

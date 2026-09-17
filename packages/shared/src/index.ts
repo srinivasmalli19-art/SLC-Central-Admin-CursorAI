@@ -85,7 +85,7 @@ export interface NavModule {
  */
 export const NAV_MODULES: readonly NavModule[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', implemented: true },
-  { id: 'applications', label: 'Applications', path: '/applications', implemented: false, permission: 'applications.view' },
+  { id: 'applications', label: 'Applications', path: '/applications', implemented: true, permission: 'applications.view' },
   { id: 'users', label: 'Users', path: '/users', implemented: false, permission: 'users.view' },
   { id: 'content', label: 'Content', path: '/content', implemented: false, permission: 'content.view' },
   { id: 'notifications', label: 'Notifications', path: '/notifications', implemented: false, permission: 'notifications.view' },
@@ -216,3 +216,139 @@ export type AuthEventType =
 /** Minimum length for Central Admin passwords (practical, not restrictive). */
 export const PASSWORD_MIN_LENGTH = 12;
 export const PASSWORD_MAX_LENGTH = 200;
+
+// ============================================================================
+// Application Registry (Phase 3)
+// ----------------------------------------------------------------------------
+// Central metadata about the applications in the SLC ecosystem. This is a
+// registry only — it does NOT connect to, authenticate against, or call any
+// external application backend. Unknown metadata is stored as NULL and rendered
+// as `UNKNOWN` in the UI; it is never fabricated.
+// ============================================================================
+
+/** Label shown in the UI whenever a metadata field is null/unknown. */
+export const UNKNOWN_LABEL = 'UNKNOWN' as const;
+
+/** Application lifecycle status. Never inferred without evidence. */
+export const APP_STATUSES = [
+  'DEVELOPMENT',
+  'STAGING',
+  'PRODUCTION',
+  'MAINTENANCE',
+  'DEPRECATED',
+  'UNKNOWN',
+] as const;
+export type AppStatus = (typeof APP_STATUSES)[number];
+
+/** Deployment environment descriptor. */
+export const DEPLOYMENT_ENVIRONMENTS = ['DEVELOPMENT', 'STAGING', 'PRODUCTION', 'UNKNOWN'] as const;
+export type DeploymentEnvironment = (typeof DEPLOYMENT_ENVIRONMENTS)[number];
+
+/** How the central platform will (eventually) integrate with the application. */
+export const INTEGRATION_TYPES = [
+  'API',
+  'FIREBASE_ADMIN',
+  'SUPABASE',
+  'REGISTRY_ONLY',
+  'PENDING',
+  'NONE',
+] as const;
+export type IntegrationType = (typeof INTEGRATION_TYPES)[number];
+
+/**
+ * Integration progress. `PLANNED` means a future intended integration only —
+ * it must NEVER be treated as currently operational. `CONNECTED` is used only
+ * once a real integration has actually been tested (not in Phase 3).
+ */
+export const INTEGRATION_STATUSES = [
+  'NOT_STARTED',
+  'PLANNED',
+  'CONFIGURED',
+  'TESTING',
+  'CONNECTED',
+  'DEGRADED',
+  'DISCONNECTED',
+  'NOT_APPLICABLE',
+] as const;
+export type IntegrationStatus = (typeof INTEGRATION_STATUSES)[number];
+
+/** A registered application (client-safe DTO). Never contains secrets. */
+export interface Application {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  platform: string | null;
+  frontendTechnology: string | null;
+  backendTechnology: string | null;
+  databaseTechnology: string | null;
+  authenticationTechnology: string | null;
+  repositoryUrl: string | null;
+  productionUrl: string | null;
+  stagingUrl: string | null;
+  environment: DeploymentEnvironment;
+  integrationType: IntegrationType;
+  adapterType: string | null;
+  integrationStatus: IntegrationStatus;
+  status: AppStatus;
+  version: string | null;
+  healthCheckEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Fields accepted when creating a registry entry. */
+export interface CreateApplicationInput {
+  slug: string;
+  name: string;
+  description?: string | null;
+  platform?: string | null;
+  frontendTechnology?: string | null;
+  backendTechnology?: string | null;
+  databaseTechnology?: string | null;
+  authenticationTechnology?: string | null;
+  repositoryUrl?: string | null;
+  productionUrl?: string | null;
+  stagingUrl?: string | null;
+  environment?: DeploymentEnvironment;
+  integrationType?: IntegrationType;
+  adapterType?: string | null;
+  integrationStatus?: IntegrationStatus;
+  status?: AppStatus;
+  version?: string | null;
+  healthCheckEnabled?: boolean;
+}
+
+export type UpdateApplicationInput = Partial<Omit<CreateApplicationInput, 'slug'>>;
+
+export type ApplicationSortField = 'name' | 'createdAt' | 'status';
+export type SortDirection = 'asc' | 'desc';
+
+export interface ApplicationListQuery {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  status?: AppStatus;
+  integrationType?: IntegrationType;
+  integrationStatus?: IntegrationStatus;
+  platform?: string;
+  sortBy?: ApplicationSortField;
+  sortDir?: SortDirection;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+/** DB-derived registry statistics for the dashboard. */
+export interface ApplicationStats {
+  total: number;
+  production: number;
+  development: number;
+  registryOnly: number;
+  pendingIntegrations: number;
+}
