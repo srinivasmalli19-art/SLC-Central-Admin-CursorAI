@@ -16,22 +16,24 @@ const depTone = { connected: 'ok', disconnected: 'warn', unknown: 'muted' } as c
 export function Dashboard() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
 
-  const load = useCallback((signal?: AbortSignal) => {
+  const load = useCallback(() => {
+    let cancelled = false;
     setState({ kind: 'loading' });
-    fetchHealth(signal)
-      .then((health) => setState({ kind: 'ready', health }))
+    fetchHealth()
+      .then((health) => {
+        if (!cancelled) setState({ kind: 'ready', health });
+      })
       .catch((error: unknown) => {
-        if (signal?.aborted) return;
+        if (cancelled) return;
         const message = error instanceof Error ? error.message : 'Failed to load health.';
         setState({ kind: 'error', message });
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    load(controller.signal);
-    return () => controller.abort();
-  }, [load]);
+  useEffect(() => load(), [load]);
 
   return (
     <section className="page">

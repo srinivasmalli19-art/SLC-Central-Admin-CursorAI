@@ -1,13 +1,25 @@
 import { NavLink } from 'react-router-dom';
 import { NAV_MODULES } from '@slc/shared';
 
+import { useAuth } from '../auth/AuthContext';
+
 interface SidebarProps {
   open: boolean;
   onNavigate: () => void;
 }
 
-/** Primary navigation. Unimplemented modules are visually flagged. */
+/**
+ * Primary navigation. Modules the admin lacks permission for are hidden as a
+ * UX affordance only — the backend independently enforces authorization.
+ * Unimplemented modules are visually flagged.
+ */
 export function Sidebar({ open, onNavigate }: SidebarProps) {
+  const { can } = useAuth();
+
+  const visibleModules = NAV_MODULES.filter(
+    (module) => !module.permission || can(module.permission),
+  );
+
   return (
     <aside className={`sidebar ${open ? 'sidebar--open' : ''}`} aria-label="Primary">
       <div className="sidebar__brand">
@@ -18,7 +30,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
       </div>
       <nav className="sidebar__nav">
         <ul>
-          {NAV_MODULES.map((module) => (
+          {visibleModules.map((module) => (
             <li key={module.id}>
               <NavLink
                 to={module.path}
@@ -39,7 +51,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
           ))}
         </ul>
       </nav>
-      <div className="sidebar__footer">Phase 1 · Foundation</div>
+      <div className="sidebar__footer">Phase 2 · Auth &amp; RBAC</div>
     </aside>
   );
 }
