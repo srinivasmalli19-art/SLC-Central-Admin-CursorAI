@@ -1,0 +1,31 @@
+// SLC Central Admin — Prisma schema (Phase 1 foundation).
+//
+// This schema establishes the CENTRAL admin database infrastructure and the
+// migration workflow only. It deliberately does NOT define the business/domain
+// model (admin users, roles, permissions, applications, audit logs, ...) —
+// those are introduced in later phases.
+//
+// The central database is independent of every external application database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Infrastructure-only key/value metadata table used to bootstrap the central
+/// database and prove out the migration workflow in Phase 1. This is NOT
+/// business data and is expected to be superseded/expanded by domain models in
+/// later phases.
+model AppMeta {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("app_meta")
+}
