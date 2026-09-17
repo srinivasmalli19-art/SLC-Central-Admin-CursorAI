@@ -1,3 +1,4 @@
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -8,6 +9,7 @@ import { API_VERSION } from '@slc/shared';
 
 import { config } from './config/env.js';
 import { logger } from './lib/logger.js';
+import { csrfProtection } from './middleware/csrf.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { v1Router } from './routes/v1.js';
 
@@ -34,9 +36,10 @@ export function createApp(): Express {
     }),
   );
 
-  // Body parsing with sane limits.
+  // Body & cookie parsing with sane limits.
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  app.use(cookieParser());
 
   // Structured request logging (silent during tests).
   app.use(pinoHttp({ logger }));
@@ -51,6 +54,9 @@ export function createApp(): Express {
       legacyHeaders: false,
     }),
   );
+
+  // CSRF protection (double-submit) for authenticated, state-changing requests.
+  app.use(`/api/${API_VERSION}`, csrfProtection);
 
   // Versioned API routes.
   app.use(`/api/${API_VERSION}`, v1Router);

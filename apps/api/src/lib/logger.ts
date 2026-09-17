@@ -14,7 +14,16 @@ export const logger = pino({
     ? { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:standard' } }
     : undefined,
   redact: {
-    paths: ['req.headers.authorization', 'req.headers.cookie', '*.password', '*.token'],
+    // Never log credentials, cookies, or tokens. `set-cookie` on responses
+    // carries the session token and MUST be stripped.
+    paths: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'res.headers["set-cookie"]',
+      '*.password',
+      '*.token',
+      '*.passwordHash',
+    ],
     remove: true,
   },
 });
