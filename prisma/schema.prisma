@@ -29,3 +29,110 @@ model AppMeta {
 
   @@map("app_meta")
 }
+
+// ============================================================================
+// Authentication & RBAC (Phase 2)
+// ----------------------------------------------------------------------------
+// Central Admin's OWN administrative identity system. These tables never hold
+// end-user identities from external SLC applications (JeevaMitra, Pasumithra,
+// SLC Vet, Stock Management, NearSip, ...). No application-user or Firebase-user
+// tables exist here.
+// ============================================================================
+
+enum AdminUserStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// A Central Admin administrator account.
+model AdminUser {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  passwordHash String
+  name         String?
+  status       AdminUserStatus @default(ACTIVE)
+  /// MFA extension point (Phase 2 architecture only — TOTP not implemented).
+  mfaEnabled   Boolean         @default(false)
+  lastLoginAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  roles    AdminUserRole[]
+  sessions AdminSession[]
+
+  @@index([status])
+  @@map("admin_user")
+}
+
+/// A named administrative role (e.g. SUPER_ADMIN). Seeded from shared config.
+model Role {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       AdminUserRole[]
+  permissions RolePermission[]
+
+  @@map("role")
+}
+
+/// A single permission key (e.g. applications.view). Seeded from shared config.
+model Permission {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@map("permission")
+}
+
+/// Many-to-many: AdminUser ↔ Role.
+model AdminUserRole {
+  adminUserId String
+  roleId      String
+  assignedAt  DateTime @default(now())
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([adminUserId, roleId])
+  @@index([roleId])
+  @@map("admin_user_role")
+}
+
+/// Many-to-many: Role ↔ Permission.
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permission")
+}
+
+/// A server-side session. The raw opaque token lives only in the client cookie;
+/// only its SHA-256 hash is stored here so logout/disable can truly invalidate.
+model AdminSession {
+  id          String   @id @default(uuid())
+  adminUserId String
+  tokenHash   String   @unique
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  lastUsedAt  DateTime @default(now())
+  userAgent   String?
+  ipAddress   String?
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+  @@map("admin_session")
+}
