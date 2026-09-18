@@ -98,6 +98,24 @@ export function createPinnedLookup(ip: string, family: 4 | 6): LookupFunction {
   }) as unknown as LookupFunction;
 }
 
+/**
+ * Build outbound headers so the security boundary OWNS the Host header: the
+ * intended hostname is applied last and cannot be overridden by caller/adapter
+ * supplied headers.
+ */
+export function buildOutboundHeaders(
+  headers: Record<string, string>,
+  hostname: string,
+): Record<string, string> {
+  // Drop any caller-supplied host (case-insensitively), then set the intended one.
+  const sanitized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() !== 'host') sanitized[key] = value;
+  }
+  sanitized.host = hostname;
+  return sanitized;
+}
+
 /** Production transport: connects to the pinned IP with SNI/Host = hostname. */
 const nodePinnedTransport: Transport = (req) =>
   new Promise<TransportResponse>((resolve, reject) => {
@@ -111,9 +129,10 @@ const nodePinnedTransport: Transport = (req) =>
         hostname: req.hostname, // Host header + TLS servername derive from this
         port: url.port || (isHttps ? 443 : 80),
         path: `${url.pathname}${url.search}`,
-        headers: { host: req.hostname, ...req.headers },
+        // Security boundary owns the Host header (caller cannot override it).
+        headers: buildOutboundHeaders(req.headers, req.hostname),
         lookup: createPinnedLookup(req.pinnedIp, req.pinnedFamily), // pin the socket
-        servername: req.hostname, // preserve SNI
+        servername: req.hostname, // preserve SNI (caller cannot override)
         rejectUnauthorized: true, // preserve certificate hostname verification
         signal: req.signal,
       },

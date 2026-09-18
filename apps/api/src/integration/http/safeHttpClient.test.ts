@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   SafeHttpClient,
+  buildOutboundHeaders,
   createPinnedLookup,
   type ResolveHost,
   type Transport,
@@ -51,6 +52,20 @@ describe('createPinnedLookup', () => {
     const cb = vi.fn();
     (lookup as unknown as (h: string, o: unknown, c: unknown) => void)('x', { all: true }, cb);
     expect(cb).toHaveBeenCalledWith(null, [{ address: PUBLIC_IP, family: 4 }]);
+  });
+});
+
+describe('buildOutboundHeaders — Host header ownership', () => {
+  it('forces the intended Host and ignores a caller-supplied host (any casing)', () => {
+    const out = buildOutboundHeaders(
+      { accept: 'application/json', Host: 'evil.internal', authorization: 'Bearer x' },
+      'api.example.com',
+    );
+    expect(out.host).toBe('api.example.com');
+    // No leftover attacker-controlled host header of any casing.
+    expect(out.Host).toBeUndefined();
+    expect(Object.keys(out).filter((k) => k.toLowerCase() === 'host')).toEqual(['host']);
+    expect(out.authorization).toBe('Bearer x');
   });
 });
 
