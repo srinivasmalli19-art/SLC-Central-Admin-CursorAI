@@ -68,6 +68,30 @@ describe('resolved-IP validation (DNS-rebinding defense)', () => {
     expect(isBlockedIp('2606:2800:220:1:248:1893:25c8:1946')).toBe(false);
   });
 
+  it('blocks IPv4-mapped IPv6 in BOTH dotted and hexadecimal forms', () => {
+    // dotted
+    expect(isBlockedIp('::ffff:127.0.0.1')).toBe(true);
+    expect(isBlockedIp('::ffff:10.0.0.1')).toBe(true);
+    // hexadecimal (same addresses)
+    expect(isBlockedIp('::ffff:a00:1')).toBe(true); // 10.0.0.1
+    expect(isBlockedIp('::ffff:c0a8:101')).toBe(true); // 192.168.1.1
+    expect(isBlockedIp('::ffff:a9fe:a9fe')).toBe(true); // 169.254.169.254 metadata
+    expect(isBlockedIp('::ffff:7f00:1')).toBe(true); // 127.0.0.1
+    expect(isBlockedIp('::ffff:6440:1')).toBe(true); // 100.64.0.1 CGNAT
+    expect(isBlockedIp('::ffff:0:1')).toBe(true); // 0.0.0.1 (0/8)
+    // public mapped address is allowed
+    expect(isBlockedIp('::ffff:93.184.216.34')).toBe(false);
+    expect(isBlockedIp('::ffff:5db8:d822')).toBe(false); // 93.184.216.34 hex
+  });
+
+  it('fails closed on malformed IPv6 / mapped forms', () => {
+    expect(isBlockedIp('not-an-ip')).toBe(true);
+    expect(isBlockedIp('::ffff:zzzz:1')).toBe(true);
+    expect(isBlockedIp('12345::')).toBe(true);
+    expect(isBlockedIp('::ffff:999.0.0.1')).toBe(true);
+    expect(isBlockedIp('')).toBe(true);
+  });
+
   it('fails closed on empty or blocked resolution sets', () => {
     expect(() => assertResolvedIpsAllowed([])).toThrowError();
     expect(() => assertResolvedIpsAllowed(['93.184.216.34', '10.0.0.1'])).toThrowError();
