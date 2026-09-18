@@ -36,12 +36,18 @@ Management adapter foundation)**. Tags: **CONFIRMED** (from source), **UNKNOWN**
    incl. metadata, CGNAT, `0/8`, IPv6 `::1`/`fe80::/10`/`fc00::/7`, and
    IPv4-mapped). Fail-closed on empty/blocked resolution.
 3. **Single guarded HTTP client** (`apps/api/src/integration/http/safeHttpClient.ts`):
-   `SafeHttpClient` owns URL validation, DNS resolution + resolved-IP validation,
-   a strict **redirect policy** (each hop re-validated, fail-closed), timeout,
-   response-size limit, correlation-ID propagation, and safe error normalization
-   (never leaks bodies/headers/tokens). External adapters must use this client;
-   a static test guard asserts the Stock adapter does not use `fetch`/`http`/
-   `https`/`axios`/`undici` directly.
+   `SafeHttpClient` resolves the host, validates **every** resolved IP,
+   deterministically **pins** one validated IP, and connects the transport to
+   that pinned IP via a custom socket `lookup` — so the address validated is the
+   address contacted (no uncontrolled second resolution / TOCTOU rebinding race).
+   For HTTPS the TLS **SNI/servername** and **Host** header remain the original
+   hostname and **certificate verification stays enabled** (`rejectUnauthorized`).
+   It also owns URL/allow-list validation, a strict **redirect policy** (each hop
+   re-resolved, re-validated, and re-pinned, fail-closed), timeout, response-size
+   limit, correlation-ID propagation, and safe error normalization (never leaks
+   bodies/headers/tokens). External adapters must use this client; a static test
+   guard asserts the Stock adapter does not use `fetch`/`http`/`https`/`axios`/
+   `undici` directly.
 4. **Egress allow-list** (`INTEGRATION_EGRESS_ALLOWLIST`, validated in
    `config/env.ts`): **fail-closed** (empty by default). The real Stock host is
    **not** added (it is UNKNOWN); `.env.example` shows placeholders only.
