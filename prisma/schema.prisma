@@ -1,0 +1,213 @@
+// SLC Central Admin — Prisma schema (Phase 1 foundation).
+//
+// This schema establishes the CENTRAL admin database infrastructure and the
+// migration workflow only. It deliberately does NOT define the business/domain
+// model (admin users, roles, permissions, applications, audit logs, ...) —
+// those are introduced in later phases.
+//
+// The central database is independent of every external application database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Infrastructure-only key/value metadata table used to bootstrap the central
+/// database and prove out the migration workflow in Phase 1. This is NOT
+/// business data and is expected to be superseded/expanded by domain models in
+/// later phases.
+model AppMeta {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("app_meta")
+}
+
+// ============================================================================
+// Authentication & RBAC (Phase 2)
+// ----------------------------------------------------------------------------
+// Central Admin's OWN administrative identity system. These tables never hold
+// end-user identities from external SLC applications (JeevaMitra, Pasumithra,
+// SLC Vet, Stock Management, NearSip, ...). No application-user or Firebase-user
+// tables exist here.
+// ============================================================================
+
+enum AdminUserStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// A Central Admin administrator account.
+model AdminUser {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  passwordHash String
+  name         String?
+  status       AdminUserStatus @default(ACTIVE)
+  /// MFA extension point (Phase 2 architecture only — TOTP not implemented).
+  mfaEnabled   Boolean         @default(false)
+  lastLoginAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  roles    AdminUserRole[]
+  sessions AdminSession[]
+
+  @@index([status])
+  @@map("admin_user")
+}
+
+/// A named administrative role (e.g. SUPER_ADMIN). Seeded from shared config.
+model Role {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       AdminUserRole[]
+  permissions RolePermission[]
+
+  @@map("role")
+}
+
+/// A single permission key (e.g. applications.view). Seeded from shared config.
+model Permission {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@map("permission")
+}
+
+/// Many-to-many: AdminUser ↔ Role.
+model AdminUserRole {
+  adminUserId String
+  roleId      String
+  assignedAt  DateTime @default(now())
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([adminUserId, roleId])
+  @@index([roleId])
+  @@map("admin_user_role")
+}
+
+/// Many-to-many: Role ↔ Permission.
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permission")
+}
+
+// ============================================================================
+// Application Registry (Phase 3)
+// ----------------------------------------------------------------------------
+// Central METADATA about ecosystem applications. This registry never stores
+// secrets and never mirrors external application business data. Unknown values
+// are stored as NULL (rendered as UNKNOWN in the UI).
+// ============================================================================
+
+enum AppStatus {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+  MAINTENANCE
+  DEPRECATED
+  UNKNOWN
+}
+
+enum DeploymentEnvironment {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+  UNKNOWN
+}
+
+enum IntegrationType {
+  API
+  FIREBASE_ADMIN
+  SUPABASE
+  REGISTRY_ONLY
+  PENDING
+  NONE
+}
+
+enum IntegrationStatus {
+  NOT_STARTED
+  PLANNED
+  CONFIGURED
+  TESTING
+  CONNECTED
+  DEGRADED
+  DISCONNECTED
+  NOT_APPLICABLE
+}
+
+/// A registered ecosystem application (metadata only). No secrets, no external
+/// business data, no credentials are ever stored here.
+model Application {
+  id                       String                @id @default(uuid())
+  slug                     String                @unique
+  name                     String
+  description              String?
+  platform                 String?
+  frontendTechnology       String?
+  backendTechnology        String?
+  databaseTechnology       String?
+  authenticationTechnology String?
+  repositoryUrl            String?
+  productionUrl            String?
+  stagingUrl               String?
+  environment              DeploymentEnvironment @default(UNKNOWN)
+  integrationType          IntegrationType       @default(NONE)
+  adapterType              String?
+  integrationStatus        IntegrationStatus     @default(NOT_STARTED)
+  status                   AppStatus             @default(UNKNOWN)
+  version                  String?
+  healthCheckEnabled       Boolean               @default(false)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+
+  @@index([status])
+  @@index([integrationType])
+  @@index([integrationStatus])
+  @@map("application")
+}
+
+/// A server-side session. The raw opaque token lives only in the client cookie;
+/// only its SHA-256 hash is stored here so logout/disable can truly invalidate.
+model AdminSession {
+  id          String   @id @default(uuid())
+  adminUserId String
+  tokenHash   String   @unique
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  lastUsedAt  DateTime @default(now())
+  userAgent   String?
+  ipAddress   String?
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+  @@map("admin_session")
+}

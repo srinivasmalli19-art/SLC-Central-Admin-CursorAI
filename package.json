@@ -1,0 +1,49 @@
+{
+  "name": "slc-central-admin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SLC Central Admin — centralized administration platform for the SLC application ecosystem.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @slc/shared",
+    "dev:api": "npm run dev -w @slc/api",
+    "dev:web": "npm run dev -w @slc/web",
+    "dev": "npm run build:shared && concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "build": "npm run build:shared && npm run build -w @slc/api && npm run build -w @slc/web",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "npm run build:shared && npm run test --workspaces --if-present",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
+    "bootstrap:admin": "npm run bootstrap:admin -w @slc/api",
+    "verify": "npm run build:shared && npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "concurrently": "^9.0.1",
+    "eslint": "^9.13.0",
+    "globals": "^15.11.0",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.11.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  }
+}
