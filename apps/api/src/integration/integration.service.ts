@@ -12,6 +12,7 @@ import type {
   IntegrationErrorCode,
 } from '@slc/shared';
 
+import { config } from '../config/env.js';
 import { requirePrisma } from '../db/prisma.js';
 import { AppError } from '../errors/AppError.js';
 import { logger } from '../lib/logger.js';
@@ -71,10 +72,7 @@ export class IntegrationService {
   constructor(options: IntegrationServiceOptions = {}) {
     this.registry = options.registry ?? defaultAdapterRegistry;
     this.resolver = options.resolver ?? new EnvCredentialResolver();
-    this.egressAllowlist =
-      options.egressAllowlist ??
-      (process.env.INTEGRATION_EGRESS_ALLOWLIST?.split(',').map((h) => h.trim()).filter(Boolean) ??
-        []);
+    this.egressAllowlist = options.egressAllowlist ?? config.integration.egressAllowlist;
     this.retry = options.retry ?? { retries: 2, baseDelayMs: 200, factor: 2, jitter: true };
     this.breakerFactory =
       options.circuitBreakerFactory ??
@@ -262,6 +260,20 @@ export class IntegrationService {
     const dto = await this.getIntegration(applicationId, environment); // 404 if unconfigured
     const correlationId = randomUUID();
     const runtimeEnv = this.runtimeEnv();
+
+    // Runtime-environment gate (Phase 5A): an integration may only be tested from
+    // a runtime whose environment matches the integration's environment. On a
+    // mismatch we reject BEFORE resolving credentials, selecting an adapter, or
+    // making any network request, and never move to a live/CONNECTED status.
+    if (dto.environment !== runtimeEnv) {
+      return this.fail(
+        dto.id,
+        correlationId,
+        'ENVIRONMENT_MISMATCH',
+        `Integration environment ${dto.environment} does not match runtime environment ${runtimeEnv}.`,
+        'DISCONNECTED',
+      );
+    }
 
     // Kill switch: a disabled integration is never operated.
     if (!dto.enabled) {

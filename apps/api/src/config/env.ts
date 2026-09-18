@@ -53,6 +53,11 @@ const envSchema = z.object({
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   LOGIN_RATE_LIMIT_WINDOW_MIN: z.coerce.number().int().positive().default(15),
 
+  // ---- Integration egress allow-list (Phase 5A) --------------------------
+  // Comma-separated list of hostnames adapters may contact. Fail-closed: empty
+  // by default so no outbound host is permitted until explicitly configured.
+  INTEGRATION_EGRESS_ALLOWLIST: z.string().default(''),
+
   // ---- Bootstrap (dev-only) super admin ----------------------------------
   BOOTSTRAP_ADMIN_EMAIL: z.string().email().optional(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),
@@ -84,6 +89,7 @@ export interface AppConfig {
   cookie: CookieConfig;
   login: { rateLimitMax: number; rateLimitWindowMs: number };
   bootstrap: { email: string | undefined; password: string | undefined };
+  integration: { egressAllowlist: string[] };
 }
 
 /**
@@ -155,6 +161,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     bootstrap: {
       email: env.BOOTSTRAP_ADMIN_EMAIL,
       password: env.BOOTSTRAP_ADMIN_PASSWORD,
+    },
+    integration: {
+      egressAllowlist: env.INTEGRATION_EGRESS_ALLOWLIST.split(',')
+        .map((h) => h.trim())
+        .filter(Boolean),
     },
   };
 }

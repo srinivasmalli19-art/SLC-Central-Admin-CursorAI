@@ -28,6 +28,8 @@ export interface ConnectionInfo {
 export interface UserSummary {
   id: string;
   status?: string;
+  /** Organisation/tenant identifier, preserved so org boundaries are explicit. */
+  orgId?: string | null;
 }
 
 /**

@@ -169,12 +169,14 @@ d('integration management API (integration)', () => {
   });
 
   it('returns NOT_APPLICABLE when no adapter is registered for the type (real external types)', async () => {
+    // Configure on DEVELOPMENT so the Phase 5A runtime-environment gate (test
+    // runtime = DEVELOPMENT) passes and we reach the unregistered-adapter check.
     await appAdmin.agent
-      .put(`${API}/applications/${appId}/integrations/STAGING`)
+      .put(`${API}/applications/${appId}/integrations/DEVELOPMENT`)
       .set('X-CSRF-Token', appAdmin.csrf)
       .send({ adapterType: 'http', enabled: true });
     const res = await appAdmin.agent
-      .post(`${API}/applications/${appId}/integrations/STAGING/test`)
+      .post(`${API}/applications/${appId}/integrations/DEVELOPMENT/test`)
       .set('X-CSRF-Token', appAdmin.csrf);
     expect(res.body.data.result.ok).toBe(false);
     expect(res.body.data.result.code).toBe('NOT_SUPPORTED');
