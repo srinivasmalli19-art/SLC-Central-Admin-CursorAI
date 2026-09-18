@@ -1,5 +1,8 @@
+import { config } from '../../config/env.js';
+import { SafeHttpClient } from '../http/safeHttpClient.js';
 import { MockAdapter } from './mockAdapter.js';
 import { NoopAdapter } from './noopAdapter.js';
+import { StockManagementAdapter } from './stock-management/stockManagementAdapter.js';
 import type { ApplicationAdapter } from './types.js';
 
 /**
@@ -32,7 +35,14 @@ export class AdapterRegistry {
   }
 }
 
-/** Default process registry — safe adapters only. */
+/** Default process registry. */
 export const defaultAdapterRegistry = new AdapterRegistry();
 defaultAdapterRegistry.register(new MockAdapter());
 defaultAdapterRegistry.register(new NoopAdapter());
+// Stock Management adapter foundation. Uses the guarded HTTP client with the
+// configured egress allow-list, which is fail-closed (empty) by default: no
+// real host is reachable until an allow-list entry is explicitly configured in
+// a future (approved) phase, so registering it here initiates no connection.
+defaultAdapterRegistry.register(
+  new StockManagementAdapter(new SafeHttpClient({ allowlist: config.integration.egressAllowlist })),
+);
