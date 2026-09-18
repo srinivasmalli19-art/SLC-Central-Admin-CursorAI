@@ -121,6 +121,9 @@ export const PERMISSIONS = [
   'admin_users.view',
   'admin_users.manage',
   'system.manage',
+  'integrations.view',
+  'integrations.manage',
+  'integrations.test',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -168,7 +171,15 @@ export const ROLE_DEFINITIONS: Record<RoleKey, { name: string; description: stri
  */
 export const ROLE_PERMISSIONS: Record<RoleKey, readonly Permission[]> = {
   SUPER_ADMIN: [...PERMISSIONS],
-  APP_ADMIN: ['applications.view', 'applications.manage', 'monitoring.view', 'reports.view'],
+  APP_ADMIN: [
+    'applications.view',
+    'applications.manage',
+    'monitoring.view',
+    'reports.view',
+    'integrations.view',
+    'integrations.manage',
+    'integrations.test',
+  ],
   CONTENT_ADMIN: ['content.view', 'content.manage', 'notifications.view', 'notifications.send'],
   SUPPORT_ADMIN: [
     'users.view',
@@ -351,4 +362,165 @@ export interface ApplicationStats {
   development: number;
   registryOnly: number;
   pendingIntegrations: number;
+}
+
+// ============================================================================
+// Integration Foundation (Phase 4)
+// ----------------------------------------------------------------------------
+// Foundation ONLY: per-environment integration configuration, credential
+// REFERENCES (never secrets), adapter contract types, and the system-derived
+// connection status. Phase 4 makes NO external calls and connects to NO real
+// application. `Application.integrationStatus` (Phase 3) remains unchanged
+// declared/registry metadata; `ApplicationIntegration.connectionStatus` (below)
+// is the future system-authoritative live state.
+// ============================================================================
+
+/** Environments an integration can be configured for (excludes UNKNOWN). */
+export const INTEGRATION_ENVIRONMENTS = ['DEVELOPMENT', 'STAGING', 'PRODUCTION'] as const;
+export type IntegrationEnvironment = (typeof INTEGRATION_ENVIRONMENTS)[number];
+
+/**
+ * System-authoritative connection status for an ApplicationIntegration.
+ *
+ * `NOT_CONFIGURED`, `CONFIGURED`, and `NOT_APPLICABLE` are derived from
+ * configuration by the Integration Layer. `TESTING`, `CONNECTED`, `DEGRADED`,
+ * and `DISCONNECTED` are produced ONLY by the Integration Layer after actual
+ * adapter execution — they can never be asserted directly through an admin API.
+ */
+export const CONNECTION_STATUSES = [
+  'NOT_CONFIGURED',
+  'CONFIGURED',
+  'TESTING',
+  'CONNECTED',
+  'DEGRADED',
+  'DISCONNECTED',
+  'NOT_APPLICABLE',
+] as const;
+export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number];
+
+/** Connection statuses that only the system (Integration Layer) may set. */
+export const SYSTEM_ONLY_CONNECTION_STATUSES: readonly ConnectionStatus[] = [
+  'TESTING',
+  'CONNECTED',
+  'DEGRADED',
+  'DISCONNECTED',
+];
+
+/**
+ * Where the secret material for a credential reference actually lives. Phase 4
+ * only wires the `ENV` provider; the others are design placeholders and no
+ * concrete production secrets manager is selected or implemented.
+ */
+export const CREDENTIAL_PROVIDERS = ['ENV', 'SECRET_STORE', 'SECRETS_MANAGER', 'ENCRYPTED_DB'] as const;
+export type CredentialProvider = (typeof CREDENTIAL_PROVIDERS)[number];
+
+/** Lifecycle of a credential reference (supports rotation/revocation). */
+export const CREDENTIAL_STATUSES = ['ACTIVE', 'ROTATING', 'REVOKED'] as const;
+export type CredentialStatus = (typeof CREDENTIAL_STATUSES)[number];
+
+/** Operations an adapter may advertise. Only advertised ones are ever invoked. */
+export const ADAPTER_CAPABILITIES = [
+  'connection.validate',
+  'application.info',
+  'application.statistics',
+  'users.list',
+  'users.get',
+  'users.disable',
+  'users.enable',
+] as const;
+export type AdapterCapability = (typeof ADAPTER_CAPABILITIES)[number];
+
+/** Integration audit/observability event types (Phase 4 emits, no secrets). */
+export const INTEGRATION_EVENT_TYPES = [
+  'CONFIG_UPDATED',
+  'INTEGRATION_ENABLED',
+  'INTEGRATION_DISABLED',
+  'CREDENTIAL_REFERENCE_UPDATED',
+  'CREDENTIAL_ACCESSED',
+  'CONNECTION_TEST_STARTED',
+  'CONNECTION_TEST_SUCCEEDED',
+  'CONNECTION_TEST_FAILED',
+] as const;
+export type IntegrationEventType = (typeof INTEGRATION_EVENT_TYPES)[number];
+
+/** Normalized integration error codes (adapter-agnostic). */
+export const INTEGRATION_ERROR_CODES = [
+  'TIMEOUT',
+  'UNAUTHORIZED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'RATE_LIMITED',
+  'UPSTREAM_5XX',
+  'MALFORMED_RESPONSE',
+  'NETWORK',
+  'CIRCUIT_OPEN',
+  'NOT_SUPPORTED',
+  'ENVIRONMENT_MISMATCH',
+  'CREDENTIAL_REVOKED',
+  'SSRF_BLOCKED',
+  'CONFIG_INVALID',
+] as const;
+export type IntegrationErrorCode = (typeof INTEGRATION_ERROR_CODES)[number];
+
+/** Client-safe credential reference DTO. NEVER contains secret material. */
+export interface CredentialReferenceDto {
+  id: string;
+  name: string;
+  provider: CredentialProvider;
+  /** Non-secret lookup key/path in the backing store (not a secret value). */
+  refKey: string;
+  environment: IntegrationEnvironment;
+  scopes: string[];
+  version: number;
+  status: CredentialStatus;
+  createdAt: string;
+  updatedAt: string;
+  rotatedAt: string | null;
+}
+
+/** Client-safe application-integration DTO. Contains no secrets. */
+export interface ApplicationIntegrationDto {
+  id: string;
+  applicationId: string;
+  environment: IntegrationEnvironment;
+  adapterType: string | null;
+  enabled: boolean;
+  baseUrl: string | null;
+  /** System-derived; never settable via admin APIs. */
+  connectionStatus: ConnectionStatus;
+  capabilities: AdapterCapability[];
+  timeoutMs: number | null;
+  lastTestedAt: string | null;
+  lastError: string | null;
+  credentialReferences: CredentialReferenceDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Input to configure an integration (no secret values, no connectionStatus). */
+export interface CredentialReferenceInput {
+  name: string;
+  provider?: CredentialProvider;
+  refKey: string;
+  environment: IntegrationEnvironment;
+  scopes?: string[];
+  status?: CredentialStatus;
+}
+
+export interface ConfigureIntegrationInput {
+  adapterType?: string | null;
+  enabled?: boolean;
+  baseUrl?: string | null;
+  timeoutMs?: number | null;
+  credentialReferences?: CredentialReferenceInput[];
+}
+
+/** Result of a connection test (no secrets). */
+export interface ConnectionTestResult {
+  connectionStatus: ConnectionStatus;
+  ok: boolean;
+  code: IntegrationErrorCode | null;
+  message: string;
+  capabilities: AdapterCapability[];
+  correlationId: string;
 }
