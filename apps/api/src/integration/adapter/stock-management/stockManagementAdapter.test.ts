@@ -1,0 +1,214 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { SafeHttpClient, type FetchImpl } from '../../http/safeHttpClient.js';
+import type { AdapterContext } from '../types.js';
+import { StockManagementAdapter } from './stockManagementAdapter.js';
+
+const HOST = 'stock.example.test';
+const BASE = `https://${HOST}`;
+
+function ctx(over: Partial<AdapterContext> = {}): AdapterContext {
+  return {
+    correlationId: 'cid-1',
+    environment: 'DEVELOPMENT',
+    baseUrl: BASE,
+    timeoutMs: 1000,
+    credentials: {},
+    ...over,
+  };
+}
+
+/** Build an adapter whose SafeHttpClient uses an injected router (no network). */
+function buildAdapter(
+  router: (url: string, init: RequestInit) => Response | Promise<Response>,
+  opts: { resolveHost?: () => Promise<string[]>; allowlist?: string[] } = {},
+) {
+  const fetchImpl: FetchImpl = (url, init) => Promise.resolve(router(url, init));
+  const http = new SafeHttpClient({
+    allowlist: opts.allowlist ?? [HOST],
+    resolveHost: opts.resolveHost ?? (async () => ['93.184.216.34']),
+    fetchImpl,
+  });
+  return new StockManagementAdapter(http);
+}
+
+function json(status: number, body: unknown, headers: Record<string, string> = {}): Response {
+  return new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers });
+}
+
+// Factories: each call returns a FRESH Response (a body can only be read once).
+const healthOk = () => json(200, { status: 'ok', timestamp: 'now', env: 'test' });
+const monitoringOk = () =>
+  json(200, {
+    success: true,
+    data: { overview: { totalOrgs: 3, activeOrgs: 2, totalUsers: 10, activeUsers30d: 5, auditEvents24h: 4 } },
+    message: 'ok',
+  });
+
+describe('StockManagementAdapter', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('advertises only read capabilities (no writes)', () => {
+    const adapter = buildAdapter(() => healthOk());
+    const caps = adapter.describeCapabilities();
+    expect(caps).toEqual(
+      expect.arrayContaining(['connection.validate', 'application.statistics', 'users.list', 'application.info']),
+    );
+    expect(caps).not.toContain('users.disable');
+    expect(caps).not.toContain('users.enable');
+  });
+
+  it('validateConnection succeeds against /health', async () => {
+    const adapter = buildAdapter((url) => (url.endsWith('/health') ? healthOk() : json(404, {})));
+    await expect(adapter.validateConnection(ctx())).resolves.toMatchObject({ detail: 'health:ok' });
+  });
+
+  it('getStatistics validates and returns monitoring data', async () => {
+    const adapter = buildAdapter(() => monitoringOk());
+    const stats = await adapter.getStatistics(ctx({ credentials: { api_token: { value: 't', scopes: [] } } }));
+    expect((stats.overview as { totalOrgs: number }).totalOrgs).toBe(3);
+  });
+
+  it('getUsers preserves organisation identifiers and does not merge orgs', async () => {
+    const usersBody = {
+      success: true,
+      data: [
+        { id: 'u1', name: 'A', email: 'a@x', role: 'Engineer', isActive: true, orgId: 'org-1' },
+        { id: 'u2', name: 'B', email: 'b@x', role: 'Admin', isActive: false, orgId: 'org-1' },
+        { id: 'u3', name: 'C', email: 'c@x', role: 'Store_Manager', isActive: true, orgId: 'org-2' },
+      ],
+      pagination: { total: 3, page: 1, limit: 50, totalPages: 1 },
+    };
+    const adapter = buildAdapter(() => json(200, usersBody));
+    const users = await adapter.getUsers(ctx({ credentials: { api_token: { value: 't', scopes: [] } } }));
+    expect(users).toHaveLength(3);
+    expect(users.map((u) => u.orgId)).toEqual(['org-1', 'org-1', 'org-2']);
+    // Distinct orgs preserved (no silent cross-org merge).
+    expect(new Set(users.map((u) => u.orgId))).toEqual(new Set(['org-1', 'org-2']));
+  });
+
+  it('getApplicationInfo returns organisations', async () => {
+    const orgsBody = {
+      success: true,
+      data: [{ id: 'org-1', name: 'Site A', siteCode: 'A1', isActive: true }],
+    };
+    const adapter = buildAdapter(() => json(200, orgsBody));
+    const info = await adapter.getApplicationInfo(ctx({ credentials: { api_token: { value: 't', scopes: [] } } }));
+    expect((info.organisations as unknown[])).toHaveLength(1);
+  });
+
+  it.each([
+    [403, 'FORBIDDEN', false],
+    [404, 'NOT_FOUND', false],
+    [429, 'RATE_LIMITED', true],
+    [500, 'UPSTREAM_5XX', true],
+  ])('maps HTTP %s to %s (retryable=%s)', async (status, code, retryable) => {
+    const adapter = buildAdapter(() => json(status as number, { success: false, message: 'x' }));
+    try {
+      await adapter.getStatistics(ctx({ credentials: { api_token: { value: 't', scopes: [] } } }));
+      throw new Error('expected error');
+    } catch (err) {
+      expect((err as { code: string }).code).toBe(code);
+      expect((err as { retryable: boolean }).retryable).toBe(retryable);
+    }
+  });
+
+  it('maps 401 to UNAUTHORIZED with a single bounded re-auth (no unlimited retries)', async () => {
+    const fetchImpl = vi.fn<FetchImpl>(async () => json(401, { success: false }));
+    const http = new SafeHttpClient({ allowlist: [HOST], resolveHost: async () => ['93.184.216.34'], fetchImpl });
+    const adapter = new StockManagementAdapter(http);
+    await expect(
+      adapter.getStatistics(ctx({ credentials: { api_token: { value: 't', scopes: [] } } })),
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED', retryable: false });
+    // attempt0 + one bounded re-auth = 2 calls, never more.
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('maps invalid JSON and schema mismatches to MALFORMED_RESPONSE', async () => {
+    const badJson = buildAdapter(() => json(200, 'not-json{'));
+    await expect(badJson.validateConnection(ctx())).rejects.toMatchObject({ code: 'MALFORMED_RESPONSE' });
+    const badSchema = buildAdapter(() => json(200, { unexpected: true }));
+    await expect(badSchema.validateConnection(ctx())).rejects.toMatchObject({ code: 'MALFORMED_RESPONSE' });
+  });
+
+  it('maps timeouts to TIMEOUT', async () => {
+    const fetchImpl: FetchImpl = (_url, init) =>
+      new Promise((_res, rej) =>
+        init.signal?.addEventListener('abort', () => {
+          const e = new Error('aborted');
+          e.name = 'AbortError';
+          rej(e);
+        }),
+      );
+    const http = new SafeHttpClient({ allowlist: [HOST], resolveHost: async () => ['93.184.216.34'], fetchImpl });
+    const adapter = new StockManagementAdapter(http);
+    await expect(adapter.validateConnection(ctx({ timeoutMs: 10 }))).rejects.toMatchObject({ code: 'TIMEOUT' });
+  });
+
+  it('blocks a non-allow-listed base URL (SSRF)', async () => {
+    const adapter = buildAdapter(() => healthOk(), { allowlist: ['other.example.test'] });
+    await expect(adapter.validateConnection(ctx())).rejects.toMatchObject({ code: 'SSRF_BLOCKED' });
+  });
+
+  it('blocks DNS rebinding to a private resolved IP (SSRF)', async () => {
+    const adapter = buildAdapter(() => healthOk(), { resolveHost: async () => ['10.0.0.5'] });
+    await expect(adapter.validateConnection(ctx())).rejects.toMatchObject({ code: 'SSRF_BLOCKED' });
+  });
+
+  it('propagates a correlation id and attaches the bearer token', async () => {
+    const fetchImpl = vi.fn<FetchImpl>(async () => monitoringOk());
+    const http = new SafeHttpClient({ allowlist: [HOST], resolveHost: async () => ['93.184.216.34'], fetchImpl });
+    const adapter = new StockManagementAdapter(http);
+    await adapter.getStatistics(ctx({ credentials: { api_token: { value: 'secret-token', scopes: [] } } }));
+    const headers = fetchImpl.mock.calls[0][1].headers as Record<string, string>;
+    expect(headers['x-correlation-id']).toBe('cid-1');
+    expect(headers.authorization).toBe('Bearer secret-token');
+  });
+
+  it('password-login provider logs in once (no refresh storm) and never leaks the password', async () => {
+    const calls: string[] = [];
+    const fetchImpl = vi.fn<FetchImpl>(async (url) => {
+      calls.push(url);
+      if (url.endsWith('/api/auth/login')) return json(200, { data: { accessToken: 'jwt-123' } });
+      return monitoringOk();
+    });
+    const http = new SafeHttpClient({ allowlist: [HOST], resolveHost: async () => ['93.184.216.34'], fetchImpl });
+    const adapter = new StockManagementAdapter(http);
+    const c = ctx({ credentials: { email: { value: 'svc@x', scopes: [] }, password: { value: 'p@ss', scopes: [] } } });
+    const a = await adapter.getStatistics(c);
+    const b = await adapter.getStatistics(c);
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+    // Each getStatistics builds its own provider; each logs in exactly once (no storm within a call).
+    expect(calls.filter((u) => u.endsWith('/api/auth/login')).length).toBeLessThanOrEqual(2);
+    // The password must never appear in any request body sent to non-login endpoints.
+    const monitoringCall = fetchImpl.mock.calls.find((cx) => String(cx[0]).endsWith('/api/monitoring'));
+    expect(JSON.stringify(monitoringCall?.[1] ?? {})).not.toContain('p@ss');
+  });
+});
+
+describe('Stock Management adapter static safety guard', () => {
+  it('does not import or use unrestricted network clients directly', () => {
+    const dir = path.dirname(fileURLToPath(import.meta.url));
+    const files = ['stockManagementAdapter.ts', 'auth.ts', 'schemas.ts'];
+    const forbidden = [
+      /\bfetch\s*\(/,
+      /from ['"]axios['"]/,
+      /from ['"]undici['"]/,
+      /require\(['"](http|https|axios|undici|node:http|node:https)['"]\)/,
+      // Node http/https module `.request(` — but NOT our guarded `this.http.request(`
+      // (a preceding `.` or word char means it is a property access, not the module).
+      /(?<![.\w])https?\.request\s*\(/,
+    ];
+    for (const file of files) {
+      const src = readFileSync(path.join(dir, file), 'utf8');
+      for (const re of forbidden) {
+        expect(re.test(src), `${file} must not match ${re}`).toBe(false);
+      }
+    }
+  });
+});
