@@ -45,6 +45,13 @@ export async function createAdmin(opts: CreateAdminOptions): Promise<string> {
   return user.id;
 }
 
+/** Create a minimal Application registry row and return its id. */
+export async function createApplication(slug: string, name: string): Promise<string> {
+  const prisma = requirePrisma();
+  const row = await prisma.application.create({ data: { slug, name } });
+  return row.id;
+}
+
 /** Create a custom role (key must start with TEST_) with explicit permissions. */
 export async function createCustomRole(key: string, permissions: Permission[]): Promise<void> {
   const prisma = requirePrisma();

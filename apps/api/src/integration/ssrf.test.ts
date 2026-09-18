@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertAllowedOutboundUrl, isBlockedHost } from './ssrf.js';
+import {
+  assertAllowedOutboundUrl,
+  assertResolvedIpsAllowed,
+  isBlockedHost,
+  isBlockedIp,
+} from './ssrf.js';
 
 describe('SSRF / egress validation', () => {
   it('flags private, loopback, link-local and metadata hosts', () => {
@@ -42,5 +47,30 @@ describe('SSRF / egress validation', () => {
   it('blocks non-http(s) schemes', () => {
     expectBlocked(() => assertAllowedOutboundUrl('file:///etc/passwd', ['whatever']));
     expectBlocked(() => assertAllowedOutboundUrl('gopher://x', ['x']));
+  });
+});
+
+describe('resolved-IP validation (DNS-rebinding defense)', () => {
+  it('blocks loopback, private, link-local, metadata and IPv6 local IPs', () => {
+    expect(isBlockedIp('127.0.0.1')).toBe(true);
+    expect(isBlockedIp('10.1.2.3')).toBe(true);
+    expect(isBlockedIp('172.16.5.5')).toBe(true);
+    expect(isBlockedIp('192.168.0.1')).toBe(true);
+    expect(isBlockedIp('169.254.169.254')).toBe(true); // cloud metadata
+    expect(isBlockedIp('100.100.0.1')).toBe(true); // CGNAT
+    expect(isBlockedIp('0.0.0.0')).toBe(true);
+    expect(isBlockedIp('::1')).toBe(true);
+    expect(isBlockedIp('fe80::1')).toBe(true);
+    expect(isBlockedIp('fd00::1')).toBe(true);
+    expect(isBlockedIp('::ffff:169.254.169.254')).toBe(true); // mapped metadata
+    // Public addresses are allowed.
+    expect(isBlockedIp('93.184.216.34')).toBe(false);
+    expect(isBlockedIp('2606:2800:220:1:248:1893:25c8:1946')).toBe(false);
+  });
+
+  it('fails closed on empty or blocked resolution sets', () => {
+    expect(() => assertResolvedIpsAllowed([])).toThrowError();
+    expect(() => assertResolvedIpsAllowed(['93.184.216.34', '10.0.0.1'])).toThrowError();
+    expect(() => assertResolvedIpsAllowed(['93.184.216.34'])).not.toThrow();
   });
 });
