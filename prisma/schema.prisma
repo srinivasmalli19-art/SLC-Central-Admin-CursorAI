@@ -187,6 +187,10 @@ model Application {
   createdAt                DateTime              @default(now())
   updatedAt                DateTime              @updatedAt
 
+  // Phase 4 back-relation only. Phase 3 columns/semantics are unchanged:
+  // `integrationStatus` above remains DECLARED registry metadata.
+  integrations ApplicationIntegration[]
+
   @@index([status])
   @@index([integrationType])
   @@index([integrationStatus])
@@ -210,4 +214,122 @@ model AdminSession {
   @@index([adminUserId])
   @@index([expiresAt])
   @@map("admin_session")
+}
+
+// ============================================================================
+// Integration Foundation (Phase 4)
+// ----------------------------------------------------------------------------
+// Per-environment integration configuration + credential REFERENCES (never
+// secret values) + integration events. No external systems are contacted and
+// no secrets are stored. `connectionStatus` is system-derived only.
+// ============================================================================
+
+enum ConnectionStatus {
+  NOT_CONFIGURED
+  CONFIGURED
+  TESTING
+  CONNECTED
+  DEGRADED
+  DISCONNECTED
+  NOT_APPLICABLE
+}
+
+enum CredentialProvider {
+  ENV
+  SECRET_STORE
+  SECRETS_MANAGER
+  ENCRYPTED_DB
+}
+
+enum CredentialStatus {
+  ACTIVE
+  ROTATING
+  REVOKED
+}
+
+enum IntegrationEnvironment {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+}
+
+enum IntegrationEventType {
+  CONFIG_UPDATED
+  INTEGRATION_ENABLED
+  INTEGRATION_DISABLED
+  CREDENTIAL_REFERENCE_UPDATED
+  CREDENTIAL_ACCESSED
+  CONNECTION_TEST_STARTED
+  CONNECTION_TEST_SUCCEEDED
+  CONNECTION_TEST_FAILED
+}
+
+/// Per-application, per-environment integration configuration. Holds no secrets.
+model ApplicationIntegration {
+  id               String                 @id @default(uuid())
+  applicationId    String
+  environment      IntegrationEnvironment
+  adapterType      String?
+  enabled          Boolean                @default(false)
+  /// Non-secret base URL; must pass egress allow-list checks at call time.
+  baseUrl          String?
+  /// SYSTEM-DERIVED ONLY. Never settable through an admin API.
+  connectionStatus ConnectionStatus       @default(NOT_CONFIGURED)
+  /// Capabilities discovered from the adapter (advertised operations).
+  capabilities     String[]               @default([])
+  timeoutMs        Int?
+  lastTestedAt     DateTime?
+  lastError        String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  application          Application           @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  credentialReferences CredentialReference[]
+  events               IntegrationEvent[]
+
+  @@unique([applicationId, environment])
+  @@index([connectionStatus])
+  @@map("application_integration")
+}
+
+/// A REFERENCE to a secret (never the secret itself). The actual value is
+/// resolved at runtime by the CredentialResolver from the backing store.
+model CredentialReference {
+  id                       String                 @id @default(uuid())
+  applicationIntegrationId String
+  /// Logical name, e.g. "api_token", "service_account".
+  name                     String
+  provider                 CredentialProvider     @default(ENV)
+  /// Non-secret lookup key/path in the backing store (NOT a secret value).
+  refKey                   String
+  environment              IntegrationEnvironment
+  scopes                   String[]               @default([])
+  version                  Int                    @default(1)
+  status                   CredentialStatus       @default(ACTIVE)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  rotatedAt                DateTime?
+
+  integration ApplicationIntegration @relation(fields: [applicationIntegrationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationIntegrationId, name])
+  @@index([status])
+  @@map("credential_reference")
+}
+
+/// Integration observability/audit event. Non-secret, redacted detail only.
+model IntegrationEvent {
+  id                       String               @id @default(uuid())
+  applicationIntegrationId String
+  type                     IntegrationEventType
+  correlationId            String?
+  outcome                  String?
+  detail                   String?
+  latencyMs                Int?
+  createdAt                DateTime             @default(now())
+
+  integration ApplicationIntegration @relation(fields: [applicationIntegrationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationIntegrationId])
+  @@map("integration_event")
 }
