@@ -14,8 +14,8 @@ import { NEARSIP_CLIENT_ID, SupabaseNearSipStore, type NearSipStore } from './ne
  * admin with its hardcoded password). SLC role for `nearsip-admin`:
  * viewer = read, admin = places + reviews, super_admin = also disable users.
  */
-const READ = ['viewer', 'admin', 'super_admin'] as const;
-const MANAGE = ['admin', 'super_admin'] as const;
+const READ = ['viewer', 'manager', 'super_admin'] as const;
+const MANAGE = ['manager', 'super_admin'] as const;
 const ACCOUNTS = ['super_admin'] as const;
 
 let store: NearSipStore = new SupabaseNearSipStore();

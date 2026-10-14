@@ -115,14 +115,25 @@ async function toIdentityUser(user: KcUser): Promise<IdentityUser> {
   };
 }
 
+/**
+ * Keycloak's `search` matches only the START of username, email, first or last
+ * name unless the term contains `*`. Admins expect "kumar" or "slc.local" to
+ * match anywhere, so wrap the (cleaned) term in wildcards.
+ */
+export function keycloakSearchTerm(raw: string | undefined): string | null {
+  const term = (raw ?? '').replace(/[*"]/g, '').trim().slice(0, 100);
+  return term ? `*${term}*` : null;
+}
+
 export async function listUsers(params: { search?: string; first?: number; max?: number }): Promise<IdentityUser[]> {
   const query = new URLSearchParams({
     briefRepresentation: 'false',
     first: String(params.first ?? 0),
     max: String(Math.min(params.max ?? 50, 100)),
   });
-  if (params.search) {
-    query.set('search', params.search);
+  const search = keycloakSearchTerm(params.search);
+  if (search) {
+    query.set('search', search);
   }
   const { data } = await kcRequest<KcUser[]>('GET', `/users?${query.toString()}`);
   return Promise.all(data.map(toIdentityUser));

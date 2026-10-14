@@ -30,7 +30,7 @@ const text = (v: unknown) => (v === null || v === undefined || v === '' ? '—' 
 /** NearSip administration (replaces the app's old in-app admin). */
 export function NearSipPage() {
   const { hasAppRole } = useAuth();
-  const canManage = hasAppRole(CLIENT, ['admin', 'super_admin']);
+  const canManage = hasAppRole(CLIENT, ['manager', 'super_admin']);
   const canAccounts = hasAppRole(CLIENT, ['super_admin']);
 
   const [tab, setTab] = useState<Tab>('places');

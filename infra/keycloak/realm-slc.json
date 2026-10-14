@@ -113,7 +113,7 @@
           "description": "Full control of JeevaMitra admin functions."
         },
         {
-          "name": "admin",
+          "name": "manager",
           "description": "Day-to-day JeevaMitra administration."
         },
         {
@@ -127,7 +127,7 @@
           "description": "Full control of SLC Vet admin functions."
         },
         {
-          "name": "admin",
+          "name": "manager",
           "description": "Day-to-day SLC Vet administration."
         },
         {
@@ -141,7 +141,7 @@
           "description": "Full control of Stock Management admin functions."
         },
         {
-          "name": "admin",
+          "name": "manager",
           "description": "Day-to-day Stock Management administration."
         },
         {
@@ -155,7 +155,7 @@
           "description": "Full NearSip administration, including deleting users."
         },
         {
-          "name": "admin",
+          "name": "manager",
           "description": "Manage NearSip places and reviews."
         },
         {
@@ -165,8 +165,8 @@
       ],
       "pasunestam-admin": [
         {
-          "name": "admin",
-          "description": "Pasunestam admin: can manage every certificate."
+          "name": "manager",
+          "description": "Pasunestam manager (local admin role): can manage every certificate."
         },
         {
           "name": "editor",
@@ -198,7 +198,7 @@
           "super_admin"
         ],
         "pasunestam-admin": [
-          "admin"
+          "manager"
         ]
       }
     },

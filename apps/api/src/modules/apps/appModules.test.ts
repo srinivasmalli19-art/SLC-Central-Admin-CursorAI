@@ -182,7 +182,7 @@ afterAll(async () => {
 
 describe('JeevaMitra from Central Admin', () => {
   it('needs a jeevamitra-admin role (Central Admin roles alone are not enough)', async () => {
-    const cookie = await signedIn({ 'stock-admin': ['admin'] });
+    const cookie = await signedIn({ 'stock-admin': ['manager'] });
     expect((await request(app).get('/api/v1/apps/jeevamitra/summary').set('Cookie', cookie)).status).toBe(403);
   });
 
@@ -202,7 +202,7 @@ describe('JeevaMitra from Central Admin', () => {
   });
 
   it('admin verifies a vet on both the account and the public vet profile, and it is audited', async () => {
-    const cookie = await signedIn({ 'jeevamitra-admin': ['admin'] });
+    const cookie = await signedIn({ 'jeevamitra-admin': ['manager'] });
     const res = await request(app)
       .post('/api/v1/apps/jeevamitra/users/v1/verification')
       .set('Cookie', cookie)
@@ -215,7 +215,7 @@ describe('JeevaMitra from Central Admin', () => {
   });
 
   it('refuses to verify a non-vet', async () => {
-    const cookie = await signedIn({ 'jeevamitra-admin': ['admin'] });
+    const cookie = await signedIn({ 'jeevamitra-admin': ['manager'] });
     const res = await request(app)
       .post('/api/v1/apps/jeevamitra/users/f1/verification')
       .set('Cookie', cookie)
@@ -225,7 +225,7 @@ describe('JeevaMitra from Central Admin', () => {
   });
 
   it('only super_admin disables accounts; admin moderates alerts', async () => {
-    const admin = await signedIn({ 'jeevamitra-admin': ['admin'] });
+    const admin = await signedIn({ 'jeevamitra-admin': ['manager'] });
     const denied = await request(app)
       .post('/api/v1/apps/jeevamitra/users/f1/account')
       .set('Cookie', admin)
@@ -277,7 +277,7 @@ describe('NearSip from Central Admin', () => {
       (await request(app).delete('/api/v1/apps/nearsip/places/1').set('Cookie', viewer).set('X-CSRF-Token', CSRF)).status,
     ).toBe(403);
 
-    const admin = await signedIn({ 'nearsip-admin': ['admin'] });
+    const admin = await signedIn({ 'nearsip-admin': ['manager'] });
     const created = await request(app)
       .post('/api/v1/apps/nearsip/places')
       .set('Cookie', admin)
@@ -302,7 +302,7 @@ describe('NearSip from Central Admin', () => {
   });
 
   it('super_admin disables a user by banning (reversible)', async () => {
-    const admin = await signedIn({ 'nearsip-admin': ['admin'] });
+    const admin = await signedIn({ 'nearsip-admin': ['manager'] });
     expect(
       (await request(app).post('/api/v1/apps/nearsip/users/u-1/account').set('Cookie', admin).set('X-CSRF-Token', CSRF).send({ disabled: true })).status,
     ).toBe(403);

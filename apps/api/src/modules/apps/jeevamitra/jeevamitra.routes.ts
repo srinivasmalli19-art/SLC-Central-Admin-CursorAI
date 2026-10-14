@@ -15,8 +15,8 @@ import { FirestoreJeevaMitraStore, JEEVAMITRA_CLIENT_ID, type JeevaMitraStore } 
  * SLC role for `jeevamitra-admin`: viewer = read, admin = verify vets and
  * moderate alerts, super_admin = also disable accounts.
  */
-const READ = ['viewer', 'admin', 'super_admin'] as const;
-const MANAGE = ['admin', 'super_admin'] as const;
+const READ = ['viewer', 'manager', 'super_admin'] as const;
+const MANAGE = ['manager', 'super_admin'] as const;
 const ACCOUNTS = ['super_admin'] as const;
 
 let store: JeevaMitraStore = new FirestoreJeevaMitraStore();

@@ -16,7 +16,7 @@ function message(err: unknown): string {
 /** JeevaMitra administration: verify vets, moderate disease alerts, manage accounts. */
 export function JeevaMitraPage() {
   const { hasAppRole } = useAuth();
-  const canManage = hasAppRole(CLIENT, ['admin', 'super_admin']);
+  const canManage = hasAppRole(CLIENT, ['manager', 'super_admin']);
   const canAccounts = hasAppRole(CLIENT, ['super_admin']);
 
   const [tab, setTab] = useState<Tab>('vets');

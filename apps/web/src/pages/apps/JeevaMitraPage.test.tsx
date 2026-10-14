@@ -50,7 +50,7 @@ describe('JeevaMitra page', () => {
   });
 
   it('lets an app admin verify a vet; viewers see no buttons', async () => {
-    const calls = mockApi({ ...base, appRoles: { 'jeevamitra-admin': ['admin'] } });
+    const calls = mockApi({ ...base, appRoles: { 'jeevamitra-admin': ['manager'] } });
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Verify' }));
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/users/v1/verification'))).toBe(true));

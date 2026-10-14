@@ -46,7 +46,7 @@ const accounts: Record<string, TestAccount> = {
     roles: ['SUPER_ADMIN'],
     resource_access: {
       'central-admin': { roles: ['SUPER_ADMIN'] },
-      'jeevamitra-admin': { roles: ['admin'] },
+      'jeevamitra-admin': { roles: ['manager'] },
       'nearsip-admin': { roles: ['viewer'] },
     },
   },
@@ -265,7 +265,7 @@ describe('Central SSO sign-in (OIDC)', () => {
     expect(me.body.data.user.permissions).toContain('admin_users.manage');
     expect(me.body.data.user.appRoles).toEqual({
       'central-admin': ['SUPER_ADMIN'],
-      'jeevamitra-admin': ['admin'],
+      'jeevamitra-admin': ['manager'],
       'nearsip-admin': ['viewer'],
     });
 

@@ -21,7 +21,7 @@ vi.mock('../../db/prisma.js', async (importOriginal) => {
 const APP_ROLES = {
   'central-admin': ['SUPER_ADMIN', 'APP_ADMIN', 'SUPPORT_ADMIN', 'REPORT_VIEWER'],
   'pasumithra-admin': ['super_admin', 'moderator', 'viewer'],
-  'stock-admin': ['super_admin', 'admin', 'viewer'],
+  'stock-admin': ['super_admin', 'manager', 'viewer'],
 };
 
 let kc: FakeKeycloak;
@@ -68,7 +68,7 @@ describe('central identity management', () => {
     expect(res.body.data.apps).toEqual([
       { clientId: 'central-admin', name: 'SLC Central Admin', roles: ['APP_ADMIN', 'REPORT_VIEWER', 'SUPER_ADMIN', 'SUPPORT_ADMIN'] },
       { clientId: 'pasumithra-admin', name: 'Pasumithra', roles: ['moderator', 'super_admin', 'viewer'] },
-      { clientId: 'stock-admin', name: 'Stock Management', roles: ['admin', 'super_admin', 'viewer'] },
+      { clientId: 'stock-admin', name: 'Stock Management', roles: ['manager', 'super_admin', 'viewer'] },
     ]);
   });
 
@@ -96,20 +96,32 @@ describe('central identity management', () => {
     expect(chief).toMatchObject({ email: 'chief@slc.test', mfaEnrolled: false, groups: ['/slc-super-admins'] });
   });
 
+  it('finds admins by any part of their email (Keycloak search is prefix-only by default)', async () => {
+    kc.addUser({ email: 'ravi.kumar@slc.test' });
+    kc.addUser({ email: 'anitha@partner.example' });
+    const { cookie } = await signedIn(['SUPER_ADMIN'], 'boss@slc.test');
+
+    const middle = await request(app).get('/api/v1/identity/users?search=slc.test').set('Cookie', cookie);
+    expect(middle.body.data.users.map((u: { email: string }) => u.email)).toEqual(['ravi.kumar@slc.test']);
+
+    const sneaky = await request(app).get('/api/v1/identity/users?search=*').set('Cookie', cookie);
+    expect(sneaky.body.data.users).toHaveLength(2);
+  });
+
   it('invites an admin with per-app roles and emails the set-password + MFA link', async () => {
     const { cookie } = await signedIn(['SUPER_ADMIN'], 'boss@slc.test');
     const res = await request(app)
       .post('/api/v1/identity/users')
       .set('Cookie', cookie)
       .set('X-CSRF-Token', CSRF)
-      .send({ email: 'New.Person@SLC.test', firstName: 'New', appRoles: { 'pasumithra-admin': ['viewer'], 'stock-admin': ['admin'] } });
+      .send({ email: 'New.Person@SLC.test', firstName: 'New', appRoles: { 'pasumithra-admin': ['viewer'], 'stock-admin': ['manager'] } });
 
     expect(res.status).toBe(201);
     expect(res.body.data.invitationEmailSent).toBe(true);
     expect(res.body.data.user).toMatchObject({
       email: 'new.person@slc.test',
       pendingActions: ['UPDATE_PASSWORD', 'CONFIGURE_TOTP', 'VERIFY_EMAIL'],
-      appRoles: { 'pasumithra-admin': ['viewer'], 'stock-admin': ['admin'] },
+      appRoles: { 'pasumithra-admin': ['viewer'], 'stock-admin': ['manager'] },
     });
     expect(kc.emailsSent[0]!.actions).toEqual(['UPDATE_PASSWORD', 'CONFIGURE_TOTP', 'VERIFY_EMAIL']);
     expect(db.state.auditLogs.at(-1)).toMatchObject({ action: 'IDENTITY_USER_INVITED', actorEmail: 'boss@slc.test' });
@@ -188,7 +200,7 @@ describe('central identity management', () => {
       .put(`/api/v1/identity/users/${ravi.id}/roles`)
       .set('Cookie', support.cookie)
       .set('X-CSRF-Token', CSRF)
-      .send({ appRoles: { 'stock-admin': ['admin'] } });
+      .send({ appRoles: { 'stock-admin': ['manager'] } });
     expect(denied.status).toBe(403);
   });
 
@@ -280,7 +292,7 @@ describe('central identity management', () => {
   });
 
   it('removing a role ends that person\'s Central Admin sessions right away', async () => {
-    const ravi = kc.addUser({ email: 'ravi@slc.test', roles: { 'central-admin': ['SUPPORT_ADMIN'], 'stock-admin': ['admin'] } });
+    const ravi = kc.addUser({ email: 'ravi@slc.test', roles: { 'central-admin': ['SUPPORT_ADMIN'], 'stock-admin': ['manager'] } });
     const raviSession = await signedIn(['SUPPORT_ADMIN'], 'ravi@slc.test', ravi.id);
     const { cookie } = await signedIn(['SUPER_ADMIN'], 'boss@slc.test');
 

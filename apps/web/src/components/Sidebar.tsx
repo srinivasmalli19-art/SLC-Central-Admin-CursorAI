@@ -8,7 +8,7 @@ export const MANAGED_APP_PAGES = [
   { clientId: 'jeevamitra-admin', label: 'JeevaMitra', path: '/apps/jeevamitra' },
   { clientId: 'nearsip-admin', label: 'NearSip', path: '/apps/nearsip' },
 ] as const;
-const ANY_APP_ROLE = ['viewer', 'admin', 'super_admin'];
+const ANY_APP_ROLE = ['viewer', 'manager', 'super_admin'];
 
 interface SidebarProps {
   open: boolean;

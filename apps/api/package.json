@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts"
+    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
+    "keycloak:live-check": "tsx scripts/keycloak-live-check.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

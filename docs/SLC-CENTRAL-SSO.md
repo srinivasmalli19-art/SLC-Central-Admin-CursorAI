@@ -226,7 +226,7 @@ An entry without `origins` is used only for server-side management (JeevaMitra).
 | SLC role (`jeevamitra-admin`) | Can |
 | --- | --- |
 | viewer | see counts, users, vets, disease alerts |
-| admin | + verify / unverify vets (account **and** public vet profile), deactivate / reactivate disease alerts |
+| manager | + verify / unverify vets (account **and** public vet profile), deactivate / reactivate disease alerts |
 | super_admin | + disable a user's Firebase account (also signs them out) |
 
 ## NearSip (`/apps/nearsip`)
@@ -241,7 +241,7 @@ NEARSIP_SUPABASE_SERVICE_ROLE_KEY=<service role key>
 | SLC role (`nearsip-admin`) | Can |
 | --- | --- |
 | viewer | see counts, places, reviews, users |
-| admin | + add / edit / delete places, delete reviews |
+| manager | + add / edit / delete places, delete reviews |
 | super_admin | + disable / enable a user (Supabase ban, reversible) |
 
 Place edits accept only the fields the old in-app admin edited (`name`, `type`,
@@ -254,3 +254,36 @@ Place edits accept only the fields the old in-app admin edited (`name`, `type`,
 account, CORS, forged/other-app tokens, back-channel logout) and
 `apps/appModules.test.ts` (JeevaMitra with an in-memory store, NearSip against a
 fake Supabase REST server; role gating, auditing, input allow-list).
+
+---
+
+# Live verification against a real Keycloak
+
+`apps/api/scripts/keycloak-live-check.ts` runs the real Central Admin code
+(Admin API client, invite/roles/disable, OIDC sign-in, Firebase bridge) against
+a running Keycloak with the `slc` realm imported. It creates one throw-away
+admin and deletes it afterwards. Use a development or staging realm.
+
+```bash
+docker compose -f infra/keycloak/docker-compose.yml up -d
+KEYCLOAK_URL=http://localhost:8080 npm run -w @slc/api keycloak:live-check
+# optional: also run Stock Management's own token verifier
+STOCK_SSO_VERIFIER=/path/to/Stock-management-Web/fieldops-manager/backend/src/utils/ssoVerifier.js \
+  KEYCLOAK_URL=http://localhost:8080 npm run -w @slc/api keycloak:live-check
+```
+
+Last run: Keycloak 26.4.0, 15/15 checks passed (realm import, least-privilege
+service account, invite with MFA set-up required, per-app roles, Central Admin
+and Pasumithra sign-in through the real login form, Firebase bridge, Stock
+Management's verifier, last-Super-Admin guard, disable signs out everywhere).
+
+## Two fixes the live run found
+
+1. **No app role may be called `admin`.** Keycloak refuses (HTTP 403) to let an
+   account with only `manage-users` grant a client role named `admin`, because
+   it collides with Keycloak's own admin role name. The day-to-day role in
+   JeevaMitra, NearSip, Stock Management, SLC Vet and Pasunestam is therefore
+   **`manager`**. `src/config/realm.test.ts` fails if `admin` comes back, and the
+   fake Keycloak used in tests now returns the same 403.
+2. **User search matches anywhere.** Keycloak's `search` is a prefix match, so
+   "kumar" or "slc.local" found nobody. Central Admin now sends `*term*`.

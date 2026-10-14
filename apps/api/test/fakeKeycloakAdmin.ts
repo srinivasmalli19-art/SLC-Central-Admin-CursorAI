@@ -163,10 +163,18 @@ export async function startFakeKeycloak(appRoles: Record<string, string[]>, grou
   });
 
   admin.get('/users', (req, res) => {
-    const search = typeof req.query.search === 'string' ? req.query.search.toLowerCase() : '';
+    // Real Keycloak semantics: a plain term is a PREFIX match on username,
+    // email, first or last name; `*` is a wildcard (so `*term*` matches anywhere).
+    const raw = typeof req.query.search === 'string' ? req.query.search.toLowerCase() : '';
+    const pattern = raw
+      ? new RegExp(`^${raw.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')}${raw.includes('*') ? '' : '.*'}$`)
+      : null;
+    const matchesSearch = (u: { username?: string; email?: string; firstName?: string; lastName?: string }) =>
+      !pattern ||
+      [u.username, u.email, u.firstName, u.lastName].some((v) => typeof v === 'string' && pattern.test(v.toLowerCase()));
     const first = Number(req.query.first ?? 0);
     const max = Number(req.query.max ?? 100);
-    res.json(users.filter((u) => !search || u.email?.includes(search)).slice(first, first + max).map(repr));
+    res.json(users.filter((u) => matchesSearch(u)).slice(first, first + max).map(repr));
   });
   admin.post('/users', (req, res) => {
     if (users.some((u) => u.username === req.body.username)) {
@@ -235,6 +243,12 @@ export async function startFakeKeycloak(appRoles: Record<string, string[]>, grou
     res.json(roleRepr(client, user.clientRoles.get(client.id) ?? []));
   });
   admin.post('/users/:id/role-mappings/clients/:uuid', (req, res) => {
+    // Real Keycloak (checked against 26.4): an account with only manage-users
+    // may not grant a client role named "admin" (it collides with Keycloak's
+    // own admin role name) and gets 403. Mirror that so tests catch it.
+    if ((req.body as { name?: string }[]).some((role) => role.name === 'admin')) {
+      return void res.status(403).json({ error: 'HTTP 403 Forbidden' });
+    }
     const user = findUser(req.params.id)!;
     const set = user.clientRoles.get(req.params.uuid) ?? new Set<string>();
     for (const role of req.body as Role[]) set.add(role.name);
