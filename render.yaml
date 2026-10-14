@@ -1,0 +1,69 @@
+# Render Blueprint: SLC central login (Keycloak) + its own PostgreSQL.
+#
+# In Render: New > Blueprint > pick this repository > Apply.
+# Values marked "sync: false" are asked for once, in the Render dashboard; they
+# are never stored in git. See infra/keycloak/production/README.md.
+#
+# Plan names change from time to time: if Render rejects one, pick the closest
+# match on render.com/pricing (Keycloak needs a 2 GB instance).
+
+databases:
+  - name: slc-keycloak-db
+    databaseName: keycloak
+    user: keycloak
+    region: singapore
+    plan: basic-1gb
+    postgresMajorVersion: "16"
+    ipAllowList: [] # reachable only from Render services in the same region
+
+services:
+  - type: web
+    name: slc-keycloak
+    runtime: docker
+    region: singapore
+    plan: standard
+    dockerContext: ./infra/keycloak/production
+    dockerfilePath: ./infra/keycloak/production/Dockerfile
+    healthCheckPath: /realms/slc/.well-known/openid-configuration
+    autoDeploy: false
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: KC_HOSTNAME
+        value: https://id.slcvet.com
+      # Database (Render fills these in from slc-keycloak-db).
+      - key: KC_DB_URL_HOST
+        fromDatabase: { name: slc-keycloak-db, property: host }
+      - key: KC_DB_URL_PORT
+        fromDatabase: { name: slc-keycloak-db, property: port }
+      - key: KC_DB_URL_DATABASE
+        fromDatabase: { name: slc-keycloak-db, property: database }
+      - key: KC_DB_USERNAME
+        fromDatabase: { name: slc-keycloak-db, property: user }
+      - key: KC_DB_PASSWORD
+        fromDatabase: { name: slc-keycloak-db, property: password }
+      # First Keycloak console login only; replace with a named admin with MFA.
+      - key: KC_BOOTSTRAP_ADMIN_USERNAME
+        sync: false
+      - key: KC_BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      # Client secrets: generated once by Render; copy into Central Admin's settings.
+      - key: KC_SECRET_CENTRAL_ADMIN
+        generateValue: true
+      - key: KC_SECRET_CENTRAL_ADMIN_API
+        generateValue: true
+      # Where each app lives (used in the realm's redirect and logout URLs).
+      - key: CENTRAL_ADMIN_URL
+        value: https://admin.slcvet.com
+      - key: CENTRAL_ADMIN_API_URL
+        value: https://admin.slcvet.com
+      - key: STOCK_URL
+        value: https://logitask.in
+      - key: STOCK_API_URL
+        sync: false
+      - key: PASUNESTAM_URL
+        value: https://pasunestam.com
+      - key: PASUMITHRA_ADMIN_URL
+        sync: false
+      - key: SLCVET_URL
+        value: https://slcvet.com

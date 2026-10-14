@@ -45,3 +45,22 @@ describe('Keycloak realm export', () => {
     }
   });
 });
+
+describe('production realm export (infra/keycloak/production)', () => {
+  const prodDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../infra/keycloak/production');
+
+  it('is regenerated from the dev realm (run make-prod-realm.mjs after editing realm-slc.json)', async () => {
+    const { makeProdRealm } = (await import(path.join(prodDir, 'make-prod-realm.mjs'))) as {
+      makeProdRealm: (dev: unknown) => unknown;
+    };
+    const expected = `${JSON.stringify(makeProdRealm(realm), null, 2)}\n`;
+    expect(readFileSync(path.join(prodDir, 'realm-slc.prod.json'), 'utf8')).toBe(expected);
+  });
+
+  it('carries no test accounts, dev secrets or localhost addresses', () => {
+    const text = readFileSync(path.join(prodDir, 'realm-slc.prod.json'), 'utf8');
+    const prod = JSON.parse(text) as { users: { username: string; serviceAccountClientId?: string }[] };
+    expect(prod.users.every((u) => u.serviceAccountClientId)).toBe(true);
+    expect(text).not.toMatch(/dev-only|localhost|127\.0\.0\.1|host\.docker\.internal/);
+  });
+});
