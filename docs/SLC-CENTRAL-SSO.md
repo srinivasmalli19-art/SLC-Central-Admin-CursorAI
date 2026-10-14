@@ -113,3 +113,69 @@ Migration `20261014090000_add_central_sso`:
   stays false for SSO accounts).
 - The realm file was written for Keycloak 26 and validated in tests against a
   standards-compliant OIDC server, not yet imported into a live Keycloak.
+
+---
+
+# Step 2: Admin access managed from Central Admin
+
+Central Admin now manages the SLC admin accounts held in Keycloak: invite,
+per-app roles, disable, sign out everywhere, resend the set-up email. Every
+change and every sign-in is written to a new audit log.
+
+## Keycloak service account
+
+The realm has a new confidential client, `central-admin-api`, with
+`serviceAccountsEnabled` and only these `realm-management` roles:
+`view-users`, `manage-users`, `query-users`, `query-groups`, `view-clients`,
+`query-clients`. It has no browser login.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `KEYCLOAK_ADMIN_CLIENT_ID` | — | `central-admin-api` |
+| `KEYCLOAK_ADMIN_CLIENT_SECRET` | — | from the secret manager |
+| `KEYCLOAK_BASE_URL` / `KEYCLOAK_REALM` | derived from `OIDC_ISSUER_URL` | set explicitly if the issuer URL is not `<base>/realms/<realm>` |
+| `KEYCLOAK_MANAGED_APPS` | all SLC app clients | `clientId=Display name` pairs, comma-separated |
+| `KEYCLOAK_SEND_INVITE_EMAIL` | `true` | needs SMTP configured in the realm |
+
+## API (`/api/v1`)
+
+| Method | Path | Permission | What |
+| --- | --- | --- | --- |
+| GET | `/identity/apps` | `admin_users.view` | managed apps and their roles |
+| GET | `/identity/users?search=` | `admin_users.view` | admins with per-app roles, groups, MFA status |
+| POST | `/identity/users` | `admin_users.manage` | invite (email, names, `appRoles`) |
+| PUT | `/identity/users/:id/roles` | `admin_users.manage` | set the roles of each listed app |
+| PATCH | `/identity/users/:id/status` | `admin_users.manage` | enable / disable (disable also signs out everywhere) |
+| POST | `/identity/users/:id/logout` | `admin_users.manage` | sign out of every app |
+| POST | `/identity/users/:id/resend-invite` | `admin_users.manage` | re-send set-password + MFA email |
+| GET | `/audit-logs`, `/audit-logs/actions` | `audit_logs.view` | audit log, newest first |
+
+Safeguards (server-side): granting Central Admin `SUPER_ADMIN`, or changing or
+disabling an existing Super Admin, needs `system.manage`; the last enabled Super
+Admin (direct or via group) cannot be demoted or disabled; nobody can disable
+themselves.
+
+Invited admins get `UPDATE_PASSWORD`, `CONFIGURE_TOTP` and `VERIFY_EMAIL` as
+required actions, so they set their own password and authenticator app; no
+password is ever chosen by another admin.
+
+## Audit log
+
+Migration `20261014100000_add_audit_log` adds `audit_log`. `recordAuthEvent`
+(all sign-in, logout, role and SSO events) now also writes there, and every
+identity change is recorded with actor, target and a secret-free summary.
+Keys that look like secrets are dropped from metadata before saving.
+
+## Web
+
+- **Admin access** (`/users`): admins, status (active, MFA, invite pending),
+  access per app, and Invite / Edit access / Sign out everywhere / Disable.
+- **Audit Logs** (`/audit-logs`): filter by action or actor email.
+
+## Tests
+
+`identity.test.ts` runs the API against an in-memory imitation of the Keycloak
+Admin REST API (`test/fakeKeycloakAdmin.ts`): listing, inviting (with and
+without working email), role validation, partial role updates, all Super Admin
+safeguards, disable-signs-out-everywhere, and CSRF. `AdminAccess.test.tsx`
+covers the page.

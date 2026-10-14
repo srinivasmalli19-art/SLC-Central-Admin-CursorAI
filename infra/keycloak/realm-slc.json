@@ -10,7 +10,6 @@
   "rememberMe": false,
   "verifyEmail": false,
   "editUsernameAllowed": false,
-
   "bruteForceProtected": true,
   "permanentLockout": false,
   "failureFactor": 5,
@@ -19,24 +18,19 @@
   "minimumQuickLoginWaitSeconds": 60,
   "quickLoginCheckMilliSeconds": 1000,
   "maxDeltaTimeSeconds": 43200,
-
   "passwordPolicy": "length(12) and notUsername and notEmail and passwordHistory(3)",
-
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
-
   "otpPolicyType": "totp",
   "otpPolicyAlgorithm": "HmacSHA1",
   "otpPolicyDigits": 6,
   "otpPolicyPeriod": 30,
   "otpPolicyLookAheadWindow": 1,
-
   "eventsEnabled": true,
   "eventsExpiration": 7776000,
   "adminEventsEnabled": true,
   "adminEventsDetailsEnabled": true,
-
   "requiredActions": [
     {
       "alias": "CONFIGURE_TOTP",
@@ -75,69 +69,170 @@
       "config": {}
     }
   ],
-
   "roles": {
     "client": {
       "central-admin": [
-        { "name": "SUPER_ADMIN", "description": "Full control over the SLC Central Admin platform." },
-        { "name": "APP_ADMIN", "description": "Manages registered applications and their integrations." },
-        { "name": "CONTENT_ADMIN", "description": "Manages content and outbound notifications." },
-        { "name": "SUPPORT_ADMIN", "description": "Handles user support operations and monitoring." },
-        { "name": "REPORT_VIEWER", "description": "Read-only access to reports." }
+        {
+          "name": "SUPER_ADMIN",
+          "description": "Full control over the SLC Central Admin platform."
+        },
+        {
+          "name": "APP_ADMIN",
+          "description": "Manages registered applications and their integrations."
+        },
+        {
+          "name": "CONTENT_ADMIN",
+          "description": "Manages content and outbound notifications."
+        },
+        {
+          "name": "SUPPORT_ADMIN",
+          "description": "Handles user support operations and monitoring."
+        },
+        {
+          "name": "REPORT_VIEWER",
+          "description": "Read-only access to reports."
+        }
       ],
       "pasumithra-admin": [
-        { "name": "super_admin", "description": "Full control of the Pasumithra admin portal." },
-        { "name": "moderator", "description": "Moderates Pasumithra listings and users." },
-        { "name": "viewer", "description": "Read-only access to the Pasumithra admin portal." }
+        {
+          "name": "super_admin",
+          "description": "Full control of the Pasumithra admin portal."
+        },
+        {
+          "name": "moderator",
+          "description": "Moderates Pasumithra listings and users."
+        },
+        {
+          "name": "viewer",
+          "description": "Read-only access to the Pasumithra admin portal."
+        }
       ],
       "jeevamitra-admin": [
-        { "name": "super_admin", "description": "Full control of JeevaMitra admin functions." },
-        { "name": "admin", "description": "Day-to-day JeevaMitra administration." },
-        { "name": "viewer", "description": "Read-only JeevaMitra admin access." }
+        {
+          "name": "super_admin",
+          "description": "Full control of JeevaMitra admin functions."
+        },
+        {
+          "name": "admin",
+          "description": "Day-to-day JeevaMitra administration."
+        },
+        {
+          "name": "viewer",
+          "description": "Read-only JeevaMitra admin access."
+        }
       ],
       "slcvet-admin": [
-        { "name": "super_admin", "description": "Full control of SLC Vet admin functions." },
-        { "name": "admin", "description": "Day-to-day SLC Vet administration." },
-        { "name": "viewer", "description": "Read-only SLC Vet admin access." }
+        {
+          "name": "super_admin",
+          "description": "Full control of SLC Vet admin functions."
+        },
+        {
+          "name": "admin",
+          "description": "Day-to-day SLC Vet administration."
+        },
+        {
+          "name": "viewer",
+          "description": "Read-only SLC Vet admin access."
+        }
       ],
       "stock-admin": [
-        { "name": "super_admin", "description": "Full control of Stock Management admin functions." },
-        { "name": "admin", "description": "Day-to-day Stock Management administration." },
-        { "name": "viewer", "description": "Read-only Stock Management admin access." }
+        {
+          "name": "super_admin",
+          "description": "Full control of Stock Management admin functions."
+        },
+        {
+          "name": "admin",
+          "description": "Day-to-day Stock Management administration."
+        },
+        {
+          "name": "viewer",
+          "description": "Read-only Stock Management admin access."
+        }
       ],
       "nearsip-admin": [
-        { "name": "super_admin", "description": "Full control of NearSip admin functions." },
-        { "name": "admin", "description": "Day-to-day NearSip administration." },
-        { "name": "viewer", "description": "Read-only NearSip admin access." }
+        {
+          "name": "super_admin",
+          "description": "Full control of NearSip admin functions."
+        },
+        {
+          "name": "admin",
+          "description": "Day-to-day NearSip administration."
+        },
+        {
+          "name": "viewer",
+          "description": "Read-only NearSip admin access."
+        }
+      ],
+      "pasunestam-admin": [
+        {
+          "name": "super_admin",
+          "description": "Full control of Pasunestam admin functions."
+        },
+        {
+          "name": "admin",
+          "description": "Day-to-day Pasunestam administration."
+        },
+        {
+          "name": "viewer",
+          "description": "Read-only Pasunestam admin access."
+        }
       ]
     }
   },
-
   "groups": [
     {
       "name": "slc-super-admins",
       "clientRoles": {
-        "central-admin": ["SUPER_ADMIN"],
-        "pasumithra-admin": ["super_admin"],
-        "jeevamitra-admin": ["super_admin"],
-        "slcvet-admin": ["super_admin"],
-        "stock-admin": ["super_admin"],
-        "nearsip-admin": ["super_admin"]
+        "central-admin": [
+          "SUPER_ADMIN"
+        ],
+        "pasumithra-admin": [
+          "super_admin"
+        ],
+        "jeevamitra-admin": [
+          "super_admin"
+        ],
+        "slcvet-admin": [
+          "super_admin"
+        ],
+        "stock-admin": [
+          "super_admin"
+        ],
+        "nearsip-admin": [
+          "super_admin"
+        ],
+        "pasunestam-admin": [
+          "super_admin"
+        ]
       }
     },
     {
       "name": "slc-support",
       "clientRoles": {
-        "central-admin": ["SUPPORT_ADMIN"],
-        "pasumithra-admin": ["viewer"],
-        "jeevamitra-admin": ["viewer"],
-        "slcvet-admin": ["viewer"],
-        "stock-admin": ["viewer"],
-        "nearsip-admin": ["viewer"]
+        "central-admin": [
+          "SUPPORT_ADMIN"
+        ],
+        "pasumithra-admin": [
+          "viewer"
+        ],
+        "jeevamitra-admin": [
+          "viewer"
+        ],
+        "slcvet-admin": [
+          "viewer"
+        ],
+        "stock-admin": [
+          "viewer"
+        ],
+        "nearsip-admin": [
+          "viewer"
+        ],
+        "pasunestam-admin": [
+          "viewer"
+        ]
       }
     }
   ],
-
   "clients": [
     {
       "clientId": "central-admin",
@@ -153,8 +248,12 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "frontchannelLogout": false,
-      "redirectUris": ["http://localhost:5173/api/v1/auth/oidc/callback"],
-      "webOrigins": ["http://localhost:5173"],
+      "redirectUris": [
+        "http://localhost:5173/api/v1/auth/oidc/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:5173"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:5173/login",
@@ -203,8 +302,12 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:5174/*"],
-      "webOrigins": ["http://localhost:5174"],
+      "redirectUris": [
+        "http://localhost:5174/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5174"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:5174/*"
@@ -250,7 +353,9 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["com.slcvet.jeevamitra.admin:/oauthredirect"],
+      "redirectUris": [
+        "com.slcvet.jeevamitra.admin:/oauthredirect"
+      ],
       "webOrigins": [],
       "attributes": {
         "pkce.code.challenge.method": "S256",
@@ -297,8 +402,12 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:3000/*"],
-      "webOrigins": ["http://localhost:3000"],
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:3000/*"
@@ -344,8 +453,12 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:5175/*"],
-      "webOrigins": ["http://localhost:5175"],
+      "redirectUris": [
+        "http://localhost:5175/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5175"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "http://localhost:5175/*"
@@ -393,7 +506,9 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["https://YOUR-NEARSIP-PROJECT.supabase.co/auth/v1/callback"],
+      "redirectUris": [
+        "https://YOUR-NEARSIP-PROJECT.supabase.co/auth/v1/callback"
+      ],
       "webOrigins": [],
       "attributes": {
         "pkce.code.challenge.method": "S256"
@@ -416,9 +531,75 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "pasunestam-admin",
+      "name": "Pasunestam admin",
+      "description": "Public client used by the Pasunestam Next.js app for admin sign-in (PKCE). Its server verifies the ID token and creates a Firebase session.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3001/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3001"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3001/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "pasunestam-admin roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "pasunestam-admin",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "pasunestam-admin audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "pasunestam-admin",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "central-admin-api",
+      "name": "Central Admin identity management",
+      "description": "Service account used by the Central Admin API to manage SLC admin users and their app roles (Keycloak Admin API). No browser login.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-only-central-admin-api-secret-change-me",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [],
+      "webOrigins": []
     }
   ],
-
   "users": [
     {
       "username": "superadmin@slc.local",
@@ -428,10 +609,19 @@
       "firstName": "Dev",
       "lastName": "Super Admin",
       "credentials": [
-        { "type": "password", "value": "DevOnly-ChangeMe-2026", "temporary": true }
+        {
+          "type": "password",
+          "value": "DevOnly-ChangeMe-2026",
+          "temporary": true
+        }
       ],
-      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"],
-      "groups": ["/slc-super-admins"]
+      "requiredActions": [
+        "UPDATE_PASSWORD",
+        "CONFIGURE_TOTP"
+      ],
+      "groups": [
+        "/slc-super-admins"
+      ]
     },
     {
       "username": "support@slc.local",
@@ -441,10 +631,34 @@
       "firstName": "Dev",
       "lastName": "Support",
       "credentials": [
-        { "type": "password", "value": "DevOnly-ChangeMe-2026", "temporary": true }
+        {
+          "type": "password",
+          "value": "DevOnly-ChangeMe-2026",
+          "temporary": true
+        }
       ],
-      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"],
-      "groups": ["/slc-support"]
+      "requiredActions": [
+        "UPDATE_PASSWORD",
+        "CONFIGURE_TOTP"
+      ],
+      "groups": [
+        "/slc-support"
+      ]
+    },
+    {
+      "username": "service-account-central-admin-api",
+      "enabled": true,
+      "serviceAccountClientId": "central-admin-api",
+      "clientRoles": {
+        "realm-management": [
+          "view-users",
+          "manage-users",
+          "query-users",
+          "query-groups",
+          "view-clients",
+          "query-clients"
+        ]
+      }
     }
   ]
 }

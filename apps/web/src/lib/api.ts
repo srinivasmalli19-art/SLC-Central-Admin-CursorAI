@@ -1,4 +1,11 @@
 import type {
+  AppRoleMap,
+  AuditLogEntry,
+  AuditLogQuery,
+  IdentityUser,
+  InviteIdentityUserInput,
+  InviteIdentityUserResult,
+  ManagedApp,
   AuthOptions,
   LogoutResult,
   Application,
@@ -133,4 +140,23 @@ export const applicationsApi = {
   update: (id: string, input: UpdateApplicationInput) =>
     api.patch<{ application: Application }>(`/applications/${id}`, input),
   stats: () => api.get<{ stats: ApplicationStats }>('/applications-stats'),
+};
+
+export const identityApi = {
+  apps: () => api.get<{ apps: ManagedApp[] }>('/identity/apps'),
+  users: (search?: string) =>
+    api.get<{ users: IdentityUser[] }>(`/identity/users${toQueryString({ search, max: 100 })}`),
+  invite: (input: InviteIdentityUserInput) => api.post<InviteIdentityUserResult>('/identity/users', input),
+  setRoles: (id: string, appRoles: AppRoleMap) =>
+    api.put<{ user: IdentityUser }>(`/identity/users/${encodeURIComponent(id)}/roles`, { appRoles }),
+  setEnabled: (id: string, enabled: boolean) =>
+    api.patch<{ user: IdentityUser }>(`/identity/users/${encodeURIComponent(id)}/status`, { enabled }),
+  signOut: (id: string) => api.post<{ signedOut: boolean }>(`/identity/users/${encodeURIComponent(id)}/logout`),
+  resendInvite: (id: string) => api.post<{ sent: boolean }>(`/identity/users/${encodeURIComponent(id)}/resend-invite`),
+};
+
+export const auditApi = {
+  list: (query: AuditLogQuery = {}) =>
+    api.get<PaginatedResult<AuditLogEntry>>(`/audit-logs${toQueryString({ ...query })}`),
+  actions: () => api.get<{ actions: string[] }>('/audit-logs/actions'),
 };

@@ -1,6 +1,7 @@
 import type { AuthEventType } from '@slc/shared';
 
 import { logger } from '../../lib/logger.js';
+import { writeAuditLog } from '../audit/auditLog.service.js';
 
 export interface AuthEventContext {
   adminUserId?: string;
@@ -14,8 +15,8 @@ export interface AuthEventContext {
 /**
  * Single choke point for authentication events.
  *
- * Phase 2 emits structured, secret-free log lines. Phase 4 will additionally
- * persist these as audit-log rows without changing any call site. This function
+ * Emits a structured, secret-free log line and persists the event to the
+ * central audit log (`audit_log` table). This function
  * must never receive passwords, tokens, or other secrets.
  */
 export function recordAuthEvent(type: AuthEventType, context: AuthEventContext = {}): void {
@@ -30,4 +31,15 @@ export function recordAuthEvent(type: AuthEventType, context: AuthEventContext =
     },
     `auth_event ${type}`,
   );
+  // Persist to the central audit log (best-effort, never throws).
+  void writeAuditLog({
+    action: type,
+    actorId: context.adminUserId,
+    actorEmail: context.email,
+    targetType: 'AdminUser',
+    targetId: context.adminUserId,
+    metadata: context.metadata,
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
 }

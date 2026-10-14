@@ -5,6 +5,8 @@ import { authRouter } from '../modules/auth/auth.routes.js';
 import { adminUsersRouter } from '../modules/admin-users/adminUsers.routes.js';
 import { applicationsRouter } from '../modules/applications/applications.routes.js';
 import { integrationsRouter } from '../modules/integrations/integrations.routes.js';
+import { identityRouter } from '../modules/identity/identity.routes.js';
+import { auditRouter } from '../modules/audit/audit.routes.js';
 
 /**
  * Versioned API router (`/api/v1`).
@@ -19,3 +21,5 @@ v1Router.use('/', authRouter);
 v1Router.use('/', adminUsersRouter);
 v1Router.use('/', applicationsRouter);
 v1Router.use('/', integrationsRouter);
+v1Router.use('/', identityRouter);
+v1Router.use('/', auditRouter);

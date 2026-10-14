@@ -78,6 +78,26 @@ const envSchema = z.object({
    */
   PASSWORD_LOGIN_ENABLED: booleanFromString.optional(),
 
+  // ---- Central identity management (Keycloak Admin API) -------------------
+  /** Keycloak base URL, e.g. https://id.slcvet.com (defaults from OIDC_ISSUER_URL). */
+  KEYCLOAK_BASE_URL: z.string().url().optional(),
+  /** Realm holding SLC admins (defaults from OIDC_ISSUER_URL). */
+  KEYCLOAK_REALM: z.string().min(1).optional(),
+  /** Service-account client allowed to manage realm users. */
+  KEYCLOAK_ADMIN_CLIENT_ID: z.string().min(1).optional(),
+  KEYCLOAK_ADMIN_CLIENT_SECRET: z.string().min(1).optional(),
+  /**
+   * Comma-separated `clientId=Display name` pairs for the apps whose admin
+   * roles Central Admin manages.
+   */
+  KEYCLOAK_MANAGED_APPS: z
+    .string()
+    .default(
+      'central-admin=SLC Central Admin,pasumithra-admin=Pasumithra,jeevamitra-admin=JeevaMitra,slcvet-admin=SLC Vet,stock-admin=Stock Management,nearsip-admin=NearSip,pasunestam-admin=Pasunestam',
+    ),
+  /** Whether to ask Keycloak to email new admins a set-password/MFA link. */
+  KEYCLOAK_SEND_INVITE_EMAIL: booleanFromString.default('true'),
+
   // ---- Bootstrap (dev-only) super admin ----------------------------------
   BOOTSTRAP_ADMIN_EMAIL: z.string().email().optional(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),
@@ -104,6 +124,15 @@ export interface OidcConfig {
   providerName: string;
 }
 
+export interface KeycloakAdminConfig {
+  baseUrl: string;
+  realm: string;
+  clientId: string;
+  clientSecret: string;
+  managedApps: { clientId: string; name: string }[];
+  sendInviteEmail: boolean;
+}
+
 export interface AppConfig {
   nodeEnv: RawEnv['NODE_ENV'];
   isProduction: boolean;
@@ -122,6 +151,8 @@ export interface AppConfig {
   bootstrap: { email: string | undefined; password: string | undefined };
   /** Central SSO settings; null when SSO is not configured. */
   oidc: OidcConfig | null;
+  /** Keycloak Admin API settings; null when central identity management is off. */
+  keycloakAdmin: KeycloakAdminConfig | null;
   /** Whether `POST /auth/login` (email + password) is accepted. */
   passwordLoginEnabled: boolean;
   integration: { egressAllowlist: string[] };
@@ -179,6 +210,29 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     errors.push('PASSWORD_LOGIN_ENABLED: cannot be false unless OIDC is configured (no way to sign in)');
   }
 
+  // Central identity management needs a service account and a realm location.
+  const kcIssuer = env.OIDC_ISSUER_URL?.match(/^(https?:\/\/.+?)\/realms\/([^/]+)\/?$/);
+  const kcBaseUrl = env.KEYCLOAK_BASE_URL ?? kcIssuer?.[1];
+  const kcRealm = env.KEYCLOAK_REALM ?? (kcIssuer ? decodeURIComponent(kcIssuer[2]!) : undefined);
+  const kcCredsSet = [env.KEYCLOAK_ADMIN_CLIENT_ID, env.KEYCLOAK_ADMIN_CLIENT_SECRET].filter(Boolean).length;
+  if (kcCredsSet === 1) {
+    errors.push('KEYCLOAK_ADMIN_CLIENT_ID and KEYCLOAK_ADMIN_CLIENT_SECRET must be set together');
+  }
+  if (kcCredsSet === 2 && (!kcBaseUrl || !kcRealm)) {
+    errors.push('KEYCLOAK_BASE_URL and KEYCLOAK_REALM are required (or an OIDC_ISSUER_URL ending in /realms/<realm>)');
+  }
+  if (isDeployed && kcCredsSet === 2 && kcBaseUrl?.startsWith('http:')) {
+    errors.push('KEYCLOAK_BASE_URL: must use https in production/staging');
+  }
+  const managedApps = env.KEYCLOAK_MANAGED_APPS.split(',')
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const [clientId, ...rest] = pair.split('=');
+      return { clientId: clientId!.trim(), name: rest.join('=').trim() || clientId!.trim() };
+    })
+    .filter((app) => /^[A-Za-z0-9._-]{1,64}$/.test(app.clientId));
+
   if (errors.length > 0) {
     throw new Error(
       `Invalid environment configuration:\n${errors.map((e) => `  - ${e}`).join('\n')}`,
@@ -226,6 +280,17 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
           providerName: env.OIDC_PROVIDER_NAME,
         }
       : null,
+    keycloakAdmin:
+      kcCredsSet === 2 && kcBaseUrl && kcRealm
+        ? {
+            baseUrl: kcBaseUrl.replace(/\/$/, ''),
+            realm: kcRealm,
+            clientId: env.KEYCLOAK_ADMIN_CLIENT_ID!,
+            clientSecret: env.KEYCLOAK_ADMIN_CLIENT_SECRET!,
+            managedApps,
+            sendInviteEmail: env.KEYCLOAK_SEND_INVITE_EMAIL,
+          }
+        : null,
     passwordLoginEnabled,
     integration: {
       egressAllowlist: env.INTEGRATION_EGRESS_ALLOWLIST.split(',')

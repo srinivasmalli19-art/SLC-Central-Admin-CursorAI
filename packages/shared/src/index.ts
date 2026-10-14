@@ -86,12 +86,12 @@ export interface NavModule {
 export const NAV_MODULES: readonly NavModule[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', implemented: true },
   { id: 'applications', label: 'Applications', path: '/applications', implemented: true, permission: 'applications.view' },
-  { id: 'users', label: 'Users', path: '/users', implemented: false, permission: 'users.view' },
+  { id: 'users', label: 'Admin access', path: '/users', implemented: true, permission: 'admin_users.view' },
   { id: 'content', label: 'Content', path: '/content', implemented: false, permission: 'content.view' },
   { id: 'notifications', label: 'Notifications', path: '/notifications', implemented: false, permission: 'notifications.view' },
   { id: 'reports', label: 'Reports', path: '/reports', implemented: false, permission: 'reports.view' },
   { id: 'monitoring', label: 'Monitoring', path: '/monitoring', implemented: false, permission: 'monitoring.view' },
-  { id: 'audit-logs', label: 'Audit Logs', path: '/audit-logs', implemented: false, permission: 'audit_logs.view' },
+  { id: 'audit-logs', label: 'Audit Logs', path: '/audit-logs', implemented: true, permission: 'audit_logs.view' },
   { id: 'settings', label: 'Settings', path: '/settings', implemented: false, permission: 'system.manage' },
 ] as const;
 
@@ -545,4 +545,79 @@ export interface ConnectionTestResult {
   message: string;
   capabilities: AdapterCapability[];
   correlationId: string;
+}
+
+// ============================================================================
+// Central identity management (SSO step 2)
+// ----------------------------------------------------------------------------
+// SLC admin accounts live in the central identity provider (Keycloak). Central
+// Admin manages them through the IdP's admin API: who may sign in, and which
+// role they hold in each SLC application.
+// ============================================================================
+
+/** An SLC application whose admin access is managed centrally. */
+export interface ManagedApp {
+  /** IdP client id, e.g. `pasumithra-admin`. */
+  clientId: string;
+  /** Display name, e.g. "Pasumithra admin portal". */
+  name: string;
+  /** Role names that can be granted in this app. */
+  roles: string[];
+}
+
+/** Role names held per app, keyed by IdP client id. */
+export type AppRoleMap = Record<string, string[]>;
+
+/** An SLC administrator as held in the central identity provider. */
+export interface IdentityUser {
+  /** IdP user id (also the OIDC `sub`). */
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  enabled: boolean;
+  emailVerified: boolean;
+  /** Whether an authenticator app (TOTP) is enrolled. */
+  mfaEnrolled: boolean;
+  /** Required actions still pending, e.g. CONFIGURE_TOTP. */
+  pendingActions: string[];
+  createdAt: string | null;
+  /** Roles granted directly per app (excludes roles inherited from groups). */
+  appRoles: AppRoleMap;
+  /** Group paths, e.g. `/slc-super-admins`. */
+  groups: string[];
+}
+
+export interface InviteIdentityUserInput {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  appRoles: AppRoleMap;
+}
+
+export interface InviteIdentityUserResult {
+  user: IdentityUser;
+  /** Whether Keycloak emailed the set-password + MFA link. */
+  invitationEmailSent: boolean;
+}
+
+/** One row of the central audit log. */
+export interface AuditLogEntry {
+  id: string;
+  createdAt: string;
+  action: string;
+  actorId: string | null;
+  actorEmail: string | null;
+  targetType: string | null;
+  targetId: string | null;
+  /** Non-sensitive detail (never secrets). */
+  metadata: Record<string, unknown> | null;
+  ipAddress: string | null;
+}
+
+export interface AuditLogQuery {
+  page?: number;
+  pageSize?: number;
+  action?: string;
+  actorEmail?: string;
 }

@@ -602,6 +602,123 @@ code {
   margin-top: 6px;
 }
 
+/* ---- Admin access + audit log ------------------------------------------------ */
+.page__lead {
+  margin: -4px 0 16px;
+  max-width: 72ch;
+}
+
+.notice {
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.access-panel {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.access-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.access-editor__app {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px 12px;
+  margin: 0;
+  min-width: 0;
+}
+
+.access-editor__name {
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.access-editor__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.access-editor__role {
+  display: flex;
+  font-size: 14px;
+}
+
+.badge-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.role-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.role-list li {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 6px;
+}
+
+.role-list__app {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.role-list__roles {
+  color: var(--text-muted);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.row-actions .btn {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.btn--danger {
+  background: transparent;
+  color: var(--down);
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
+.btn--danger:hover {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: var(--down);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.table__detail {
+  font-size: 13px;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
 /* ---- Responsive ------------------------------------------------------------ */
 @media (max-width: 860px) {
   .sidebar {

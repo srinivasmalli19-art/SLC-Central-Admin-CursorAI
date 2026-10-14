@@ -341,3 +341,31 @@ model IntegrationEvent {
   @@index([applicationIntegrationId])
   @@map("integration_event")
 }
+
+// ============================================================================
+// Central audit log (SSO step 2)
+// ----------------------------------------------------------------------------
+// Every privileged action and authentication event. Secret-free by contract:
+// metadata never holds passwords, tokens or credential values.
+// ============================================================================
+
+/// One audited action.
+model AuditLog {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  /// e.g. ADMIN_SSO_LOGIN, IDENTITY_USER_INVITED, IDENTITY_ROLES_CHANGED.
+  action     String
+  actorId    String?
+  /// Snapshot of the actor's email; survives account deletion.
+  actorEmail String?
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
+  @@map("audit_log")
+}

@@ -11,6 +11,8 @@ import { NotFound } from './pages/NotFound';
 import { ApplicationsList } from './pages/applications/ApplicationsList';
 import { ApplicationDetail } from './pages/applications/ApplicationDetail';
 import { ApplicationForm } from './pages/applications/ApplicationForm';
+import { AdminAccess } from './pages/admin-access/AdminAccess';
+import { AuditLogs } from './pages/audit/AuditLogs';
 
 /**
  * Application routing.
@@ -60,6 +62,23 @@ export function App() {
             element={
               <RequirePermission permission="applications.manage">
                 <ApplicationForm mode="edit" />
+              </RequirePermission>
+            }
+          />
+
+          <Route
+            path="users"
+            element={
+              <RequirePermission permission="admin_users.view">
+                <AdminAccess />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="audit-logs"
+            element={
+              <RequirePermission permission="audit_logs.view">
+                <AuditLogs />
               </RequirePermission>
             }
           />

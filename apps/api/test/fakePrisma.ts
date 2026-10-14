@@ -56,6 +56,7 @@ export function createFakePrisma(roleKeys: readonly string[], rolePermissions: R
   const roles: RoleRow[] = roleKeys.map((key) => ({ id: randomUUID(), key, name: key }));
   const userRoles: UserRoleRow[] = [];
   const sessions: SessionRow[] = [];
+  const auditLogs: Record<string, unknown>[] = [];
 
   const withRoles = (user: AdminUserRow) => ({
     ...user,
@@ -170,8 +171,50 @@ export function createFakePrisma(roleKeys: readonly string[], rolePermissions: R
         return { count };
       },
     },
+    auditLog: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = { id: randomUUID(), createdAt: new Date(), ...data };
+        auditLogs.push(row);
+        return row;
+      },
+    },
     $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations),
   };
 
-  return { prisma, state: { users, roles, userRoles, sessions } };
+  /** Test helper: create an ACTIVE admin with roles and a live session; returns the raw cookie token. */
+  async function seedAdminWithSession(
+    input: { email: string; roles: string[]; oidcSubject?: string },
+    hashToken: (token: string) => string,
+  ): Promise<{ adminId: string; token: string }> {
+    const now = new Date();
+    const adminId = randomUUID();
+    users.push({
+      id: adminId,
+      email: input.email,
+      passwordHash: null,
+      oidcSubject: input.oidcSubject ?? null,
+      name: null,
+      status: 'ACTIVE',
+      mfaEnabled: false,
+      lastLoginAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    for (const key of input.roles) {
+      userRoles.push({ adminUserId: adminId, roleId: roles.find((r) => r.key === key)!.id });
+    }
+    const token = randomUUID();
+    sessions.push({
+      id: randomUUID(),
+      adminUserId: adminId,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + 3600_000),
+      lastUsedAt: now,
+      oidcSid: null,
+      idTokenHint: null,
+    });
+    return { adminId, token };
+  }
+
+  return { prisma, state: { users, roles, userRoles, sessions, auditLogs }, seedAdminWithSession };
 }
