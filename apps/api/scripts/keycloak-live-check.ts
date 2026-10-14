@@ -60,6 +60,15 @@ async function expectError(fn: () => Promise<unknown>, code: string): Promise<st
   }
   throw new Error(`expected ${code}, but the call succeeded`);
 }
+/** A token must be usable by exactly one app: aud == [clientId] and azp == clientId. */
+function assertOnlyFor(token: string, clientId: string): void {
+  const claims = decodeJwt(token);
+  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  assert(
+    aud.length === 1 && aud[0] === clientId && claims.azp === clientId,
+    `token for ${clientId} has aud=${JSON.stringify(claims.aud)} azp=${String(claims.azp)} (other apps would accept it)`,
+  );
+}
 function decodeJwt(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString('utf8')) as Record<string, unknown>;
 }
@@ -254,8 +263,7 @@ async function main(): Promise<void> {
   await check('Pasumithra admin sign-in (public client + PKCE) gets only Pasumithra roles', async () => {
     pasumithraToken = await publicClientLogin(oidc, 'pasumithra-admin', 'http://localhost:3001/auth/callback', email, password);
     const access = decodeJwt(pasumithraToken);
-    const aud = Array.isArray(access.aud) ? access.aud : [access.aud];
-    assert(aud.includes('pasumithra-admin'), `aud is ${JSON.stringify(access.aud)}`);
+    assertOnlyFor(pasumithraToken, 'pasumithra-admin');
     assert(JSON.stringify(access.roles) === '["moderator"]', `roles claim is ${JSON.stringify(access.roles)}`);
     return `access token lifetime ${Number(access.exp) - Number(access.iat)}s`;
   });
@@ -287,7 +295,15 @@ async function main(): Promise<void> {
     await identity.setUserAppRoles(userId, { 'stock-admin': ['manager'] }, superActor);
     const token = await publicClientLogin(oidc, 'stock-admin', 'http://localhost:3000/sso/callback', email, password);
     const access = decodeJwt(token);
+    assertOnlyFor(token, 'stock-admin');
     assert(JSON.stringify(access.roles) === '["manager"]', `roles claim is ${JSON.stringify(access.roles)}`);
+    let bridgeRefused = false;
+    try {
+      await exchangeForFirebaseToken('pasumithra-admin', token);
+    } catch {
+      bridgeRefused = true;
+    }
+    assert(bridgeRefused, 'Firebase bridge accepted a Stock Management token for Pasumithra');
     const verifierPath = process.env.STOCK_SSO_VERIFIER;
     if (!verifierPath) {
       return 'token OK (set STOCK_SSO_VERIFIER to also run the Stock app\'s own verifier)';

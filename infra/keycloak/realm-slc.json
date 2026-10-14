@@ -298,7 +298,15 @@
             "introspection.token.claim": "false"
           }
         }
-      ]
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": []
     },
     {
       "clientId": "pasumithra-admin",
@@ -351,7 +359,16 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": []
     },
     {
       "clientId": "jeevamitra-admin",
@@ -395,7 +412,16 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": []
     },
     {
       "clientId": "slcvet-admin",
@@ -446,7 +472,16 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": []
     },
     {
       "clientId": "stock-admin",
@@ -503,7 +538,16 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": []
     },
     {
       "clientId": "nearsip-admin",
@@ -535,7 +579,16 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": []
     },
     {
       "clientId": "pasunestam-admin",
@@ -587,7 +640,16 @@
             "introspection.token.claim": "true"
           }
         }
-      ]
+      ],
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": []
     },
     {
       "clientId": "central-admin-api",
@@ -666,5 +728,66 @@
         ]
       }
     }
-  ]
+  ],
+  "clientScopeMappings": {
+    "pasumithra-admin": [
+      {
+        "client": "pasumithra-admin",
+        "roles": [
+          "super_admin",
+          "moderator",
+          "viewer"
+        ]
+      }
+    ],
+    "jeevamitra-admin": [
+      {
+        "client": "jeevamitra-admin",
+        "roles": [
+          "super_admin",
+          "manager",
+          "viewer"
+        ]
+      }
+    ],
+    "slcvet-admin": [
+      {
+        "client": "slcvet-admin",
+        "roles": [
+          "super_admin",
+          "manager",
+          "viewer"
+        ]
+      }
+    ],
+    "stock-admin": [
+      {
+        "client": "stock-admin",
+        "roles": [
+          "super_admin",
+          "manager",
+          "viewer"
+        ]
+      }
+    ],
+    "nearsip-admin": [
+      {
+        "client": "nearsip-admin",
+        "roles": [
+          "super_admin",
+          "manager",
+          "viewer"
+        ]
+      }
+    ],
+    "pasunestam-admin": [
+      {
+        "client": "pasunestam-admin",
+        "roles": [
+          "manager",
+          "editor"
+        ]
+      }
+    ]
+  }
 }

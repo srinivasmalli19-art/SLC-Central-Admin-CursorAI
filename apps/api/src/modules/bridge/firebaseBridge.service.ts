@@ -77,6 +77,12 @@ async function verifyIdpToken(token: string, audience: string, opts: { logout?: 
     audience,
     ...(opts.logout ? { requiredClaims: ['iat'], maxTokenAge: '10m' } : {}),
   });
+  // Sign-in tokens must have been issued TO this app (authorized party), not
+  // merely list it in `aud`; otherwise a token from another SLC app whose
+  // audience happens to include this one would be accepted.
+  if (!opts.logout && payload.azp !== audience) {
+    throw new Error(`token was issued to ${String(payload.azp)}, not ${audience}`);
+  }
   return payload;
 }
 

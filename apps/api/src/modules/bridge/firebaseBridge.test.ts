@@ -21,13 +21,19 @@ let app: Express;
 
 const ORIGIN = 'http://localhost:5174';
 
-async function idpToken(claims: Record<string, unknown>, opts: { audience?: string; logout?: boolean } = {}) {
+async function idpToken(
+  claims: Record<string, unknown>,
+  opts: { audience?: string | string[]; logout?: boolean } = {},
+) {
+  const audience = opts.audience ?? 'pasumithra-admin';
+  // Like Keycloak: a sign-in token's azp is the app it was issued to.
+  const withAzp = opts.logout || 'azp' in claims ? claims : { azp: Array.isArray(audience) ? audience[0] : audience, ...claims };
   const jwt = new SignJWT(
-    opts.logout ? { events: { 'http://schemas.openid.net/event/backchannel-logout': {} }, ...claims } : claims,
+    opts.logout ? { events: { 'http://schemas.openid.net/event/backchannel-logout': {} }, ...claims } : withAzp,
   )
     .setProtectedHeader({ alg: 'RS256', kid: jwk.kid! })
     .setIssuer(issuer)
-    .setAudience(opts.audience ?? 'pasumithra-admin')
+    .setAudience(audience)
     .setIssuedAt();
   if (!opts.logout) jwt.setExpirationTime('5m');
   return jwt.sign(signingKey);
@@ -131,6 +137,8 @@ describe('Firebase bridge', () => {
       [await idpToken({ sub: 'kc-ravi', roles: ['moderator'] }, { audience: 'jeevamitra-admin' }), 401],
       [forged, 401],
       [await idpToken({ sub: 'kc-ravi', roles: [] }), 403],
+      // Issued to Stock Management, but its audience also lists Pasumithra.
+      [await idpToken({ sub: 'kc-ravi', roles: ['super_admin'], azp: 'stock-admin' }, { audience: ['stock-admin', 'pasumithra-admin'] }), 401],
     ];
     for (const [token, status] of cases) {
       const res = await request(app).post('/api/v1/bridge/firebase/pasumithra-admin/token').send({ accessToken: token });
