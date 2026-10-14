@@ -273,11 +273,12 @@ STOCK_SSO_VERIFIER=/path/to/Stock-management-Web/fieldops-manager/backend/src/ut
 ```
 
 Last run: Keycloak 26.4.0, 15/15 checks passed (realm import, least-privilege
-service account, invite with MFA set-up required, per-app roles, Central Admin
-and Pasumithra sign-in through the real login form, Firebase bridge, Stock
-Management's verifier, last-Super-Admin guard, disable signs out everywhere).
+service account, invite with MFA set-up required, per-app roles, Central Admin,
+Pasumithra and Stock Management sign-in through the real login form, every app
+token usable only by its own app, Firebase bridge, Stock Management's own
+verifier, last-Super-Admin guard, disable signs out everywhere).
 
-## Two fixes the live run found
+## Three fixes the live run found
 
 1. **No app role may be called `admin`.** Keycloak refuses (HTTP 403) to let an
    account with only `manage-users` grant a client role named `admin`, because
@@ -287,3 +288,17 @@ Management's verifier, last-Super-Admin guard, disable signs out everywhere).
    fake Keycloak used in tests now returns the same 403.
 2. **User search matches anywhere.** Keycloak's `search` is a prefix match, so
    "kumar" or "slc.local" found nobody. Central Admin now sends `*term*`.
+3. **A token works only in the app it was issued to.** With Keycloak's defaults
+   (full scope plus the built-in `roles` scope, whose "audience resolve" mapper
+   copies every app the person has roles in into `aud`), a token issued to
+   Pasumithra also listed `stock-admin` in its audience and was accepted by
+   Stock Management. Someone who was `super_admin` in Pasumithra and only a
+   viewer in Stock could have used it to open Stock as a Super_Admin. Fixed twice:
+   - realm: each app client has `fullScopeAllowed: false`, a scope mapping for
+     its own roles only, and no `roles` default scope; Central Admin keeps all
+     roles in its ID token (it needs them) but has no foreign audiences;
+   - code: the Firebase bridge, Stock Management and Pasunestam also require
+     `azp` (the app the token was issued to) to be themselves.
+
+   Any app added later must get the same client settings; copy an existing app
+   client in `realm-slc.json`.
