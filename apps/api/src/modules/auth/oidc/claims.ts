@@ -66,3 +66,26 @@ export function displayNameFromClaims(claims: Record<string, unknown>): string |
   const combined = `${given} ${family}`.trim();
   return combined ? combined.slice(0, 200) : null;
 }
+
+/**
+ * Per-app roles from Keycloak's `resource_access` claim
+ * (`{ "<client id>": { "roles": [...] } }`), limited to `allowedClients`
+ * when given.
+ */
+export function extractAppRoles(
+  claims: Record<string, unknown>,
+  allowedClients?: readonly string[],
+): Record<string, string[]> {
+  const access = claims.resource_access;
+  const out: Record<string, string[]> = {};
+  if (!access || typeof access !== 'object' || Array.isArray(access)) return out;
+  for (const [clientId, entry] of Object.entries(access as Record<string, unknown>)) {
+    if (allowedClients && !allowedClients.includes(clientId)) continue;
+    const roles = (entry as { roles?: unknown } | null)?.roles;
+    if (Array.isArray(roles)) {
+      const clean = roles.filter((r): r is string => typeof r === 'string');
+      if (clean.length > 0) out[clientId] = [...new Set(clean)].sort();
+    }
+  }
+  return out;
+}

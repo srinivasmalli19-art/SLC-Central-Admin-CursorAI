@@ -12,6 +12,7 @@ import { logger } from '../../lib/logger.js';
 import { writeAuditLog } from '../audit/auditLog.service.js';
 import { hasPermission, type ResolvedAdmin } from '../auth/permissions.js';
 import { revokeAllSessions } from '../auth/session.service.js';
+import { revokeFirebaseSessions } from '../bridge/firebaseBridge.service.js';
 import {
   getClientUuid,
   kcRequest,
@@ -307,6 +308,8 @@ export async function setUserAppRoles(userId: string, appRoles: AppRoleMap, acto
 /** End every session of this person: in Keycloak (all apps) and in Central Admin. */
 async function endAllSessions(userId: string): Promise<number> {
   await kcRequest('POST', `/users/${encodeURIComponent(userId)}/logout`);
+  // Firebase-backed apps (Pasumithra, JeevaMitra) keep their own refresh tokens.
+  await revokeFirebaseSessions(userId);
   const prisma = getPrisma();
   if (!prisma) {
     return 0;

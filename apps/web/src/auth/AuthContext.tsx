@@ -13,6 +13,8 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   /** UX-only permission check. The backend remains authoritative. */
   can: (permission: Permission) => boolean;
+  /** UX-only: whether the admin holds any of `roles` in an SLC app. */
+  hasAppRole: (clientId: string, roles: readonly string[]) => boolean;
   refresh: () => Promise<void>;
 }
 
@@ -71,9 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const hasAppRole = useCallback(
+    (clientId: string, roles: readonly string[]) =>
+      Boolean(user?.appRoles?.[clientId]?.some((role) => roles.includes(role))),
+    [user],
+  );
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, login, logout, can, refresh }),
-    [status, user, login, logout, can, refresh],
+    () => ({ status, user, login, logout, can, hasAppRole, refresh }),
+    [status, user, login, logout, can, hasAppRole, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

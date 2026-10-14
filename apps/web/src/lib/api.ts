@@ -101,6 +101,7 @@ export const api = {
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
+  delete: <T>(path: string) => request<T>('DELETE', path),
 };
 
 export function fetchHealth(): Promise<HealthResponse> {
@@ -159,4 +160,81 @@ export const auditApi = {
   list: (query: AuditLogQuery = {}) =>
     api.get<PaginatedResult<AuditLogEntry>>(`/audit-logs${toQueryString({ ...query })}`),
   actions: () => api.get<{ actions: string[] }>('/audit-logs/actions'),
+};
+
+// ---- SLC apps managed from Central Admin ----------------------------------------
+export interface JmUser {
+  uid: string;
+  name: string;
+  phone: string;
+  role: string;
+  village: string | null;
+  district: string | null;
+  isVerified: boolean;
+  isProfileComplete: boolean;
+}
+export interface JmAlert {
+  id: string;
+  title: string;
+  disease: string;
+  severity: string;
+  district: string;
+  village: string;
+  isActive: boolean;
+  issuedAt: string | null;
+  reportedBy: string | null;
+  sourceAuthority: string;
+}
+export interface JmSummary {
+  users: number;
+  farmers: number;
+  shepherds: number;
+  vets: number;
+  vetsAwaitingVerification: number;
+  farms: number;
+  bookings: number;
+  activeDiseaseAlerts: number;
+}
+
+export const jeevamitraApi = {
+  summary: () => api.get<JmSummary>('/apps/jeevamitra/summary'),
+  users: (q: { role?: string; verified?: boolean; after?: string } = {}) =>
+    api.get<{ items: JmUser[]; nextCursor: string | null }>(
+      `/apps/jeevamitra/users${toQueryString({ ...q, verified: q.verified === undefined ? undefined : String(q.verified), limit: 50 })}`,
+    ),
+  setVerified: (uid: string, verified: boolean) =>
+    api.post<{ user: JmUser; vetProfilesUpdated: number }>(`/apps/jeevamitra/users/${encodeURIComponent(uid)}/verification`, { verified }),
+  setDisabled: (uid: string, disabled: boolean) =>
+    api.post<{ uid: string; disabled: boolean }>(`/apps/jeevamitra/users/${encodeURIComponent(uid)}/account`, { disabled }),
+  alerts: (activeOnly = true) => api.get<{ alerts: JmAlert[] }>(`/apps/jeevamitra/alerts?activeOnly=${activeOnly}`),
+  setAlertActive: (id: string, active: boolean) =>
+    api.post<{ id: string; active: boolean }>(`/apps/jeevamitra/alerts/${encodeURIComponent(id)}/status`, { active }),
+};
+
+export type NsRow = Record<string, unknown> & { id: string };
+export interface NsPlaceInput {
+  name: string;
+  type: 'drink' | 'food' | 'both' | 'hotspot';
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  rating: number | null;
+  is_hotspot: boolean;
+  is_verified: boolean;
+  is_popular: boolean;
+}
+
+export const nearsipApi = {
+  summary: () => api.get<{ places: number; reviews: number; users: number }>('/apps/nearsip/summary'),
+  places: (q: { search?: string; offset?: number } = {}) =>
+    api.get<{ items: NsRow[]; total: number | null }>(`/apps/nearsip/places${toQueryString({ ...q, limit: 25 })}`),
+  createPlace: (input: NsPlaceInput) => api.post<{ place: NsRow }>('/apps/nearsip/places', input),
+  updatePlace: (id: string, input: Partial<NsPlaceInput>) =>
+    api.patch<{ place: NsRow }>(`/apps/nearsip/places/${encodeURIComponent(id)}`, input),
+  deletePlace: (id: string) => api.delete<{ deleted: boolean }>(`/apps/nearsip/places/${encodeURIComponent(id)}`),
+  reviews: (offset = 0) => api.get<{ items: NsRow[]; total: number | null }>(`/apps/nearsip/reviews?limit=25&offset=${offset}`),
+  deleteReview: (id: string) => api.delete<{ deleted: boolean }>(`/apps/nearsip/reviews/${encodeURIComponent(id)}`),
+  users: (offset = 0) => api.get<{ items: NsRow[]; total: number | null }>(`/apps/nearsip/users?limit=25&offset=${offset}`),
+  setUserDisabled: (id: string, disabled: boolean) =>
+    api.post<{ id: string; disabled: boolean }>(`/apps/nearsip/users/${encodeURIComponent(id)}/account`, { disabled }),
 };

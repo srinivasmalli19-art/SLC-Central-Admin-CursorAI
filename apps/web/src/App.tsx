@@ -13,6 +13,9 @@ import { ApplicationDetail } from './pages/applications/ApplicationDetail';
 import { ApplicationForm } from './pages/applications/ApplicationForm';
 import { AdminAccess } from './pages/admin-access/AdminAccess';
 import { AuditLogs } from './pages/audit/AuditLogs';
+import { JeevaMitraPage } from './pages/apps/JeevaMitraPage';
+import { NearSipPage } from './pages/apps/NearSipPage';
+import { RequireAppRole } from './pages/apps/RequireAppRole';
 
 /**
  * Application routing.
@@ -80,6 +83,23 @@ export function App() {
               <RequirePermission permission="audit_logs.view">
                 <AuditLogs />
               </RequirePermission>
+            }
+          />
+
+          <Route
+            path="apps/jeevamitra"
+            element={
+              <RequireAppRole clientId="jeevamitra-admin" appName="JeevaMitra">
+                <JeevaMitraPage />
+              </RequireAppRole>
+            }
+          />
+          <Route
+            path="apps/nearsip"
+            element={
+              <RequireAppRole clientId="nearsip-admin" appName="NearSip">
+                <NearSipPage />
+              </RequireAppRole>
             }
           />
 

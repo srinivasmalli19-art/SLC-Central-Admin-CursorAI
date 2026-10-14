@@ -12,6 +12,7 @@ const superAdmin: CurrentUser = {
   name: 'Boss',
   status: 'ACTIVE',
   mfaEnabled: false,
+  appRoles: {},
   roles: ['SUPER_ADMIN'],
   permissions: ['admin_users.view', 'admin_users.manage', 'system.manage'],
 };

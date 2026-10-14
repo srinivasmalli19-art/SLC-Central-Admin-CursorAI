@@ -152,11 +152,11 @@
       "nearsip-admin": [
         {
           "name": "super_admin",
-          "description": "Full control of NearSip admin functions."
+          "description": "Full NearSip administration, including deleting users."
         },
         {
           "name": "admin",
-          "description": "Day-to-day NearSip administration."
+          "description": "Manage NearSip places and reviews."
         },
         {
           "name": "viewer",
@@ -165,16 +165,12 @@
       ],
       "pasunestam-admin": [
         {
-          "name": "super_admin",
-          "description": "Full control of Pasunestam admin functions."
-        },
-        {
           "name": "admin",
-          "description": "Day-to-day Pasunestam administration."
+          "description": "Pasunestam admin: can manage every certificate."
         },
         {
-          "name": "viewer",
-          "description": "Read-only Pasunestam admin access."
+          "name": "editor",
+          "description": "Pasunestam editor: can cancel any certificate."
         }
       ]
     }
@@ -202,7 +198,7 @@
           "super_admin"
         ],
         "pasunestam-admin": [
-          "super_admin"
+          "admin"
         ]
       }
     },
@@ -225,9 +221,6 @@
           "viewer"
         ],
         "nearsip-admin": [
-          "viewer"
-        ],
-        "pasunestam-admin": [
           "viewer"
         ]
       }
@@ -289,13 +282,28 @@
             "access.token.claim": "true",
             "introspection.token.claim": "true"
           }
+        },
+        {
+          "name": "all app roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "resource_access.${client_id}.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "false"
+          }
         }
       ]
     },
     {
       "clientId": "pasumithra-admin",
       "name": "Pasumithra admin portal",
-      "description": "Public SPA client (Authorization Code + PKCE). Wired up in rollout step 4.",
+      "description": "Public SPA client (PKCE). SLC Central Admin's Firebase bridge exchanges its access token for a Firebase custom token.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -303,14 +311,16 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:5174/*"
+        "http://localhost:3001/*"
       ],
       "webOrigins": [
-        "http://localhost:5174"
+        "http://localhost:3001"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5174/*"
+        "post.logout.redirect.uris": "http://localhost:3001/*",
+        "backchannel.logout.url": "http://host.docker.internal:4000/api/v1/bridge/firebase/pasumithra-admin/backchannel-logout",
+        "backchannel.logout.session.required": "true"
       },
       "protocolMappers": [
         {
@@ -346,21 +356,16 @@
     {
       "clientId": "jeevamitra-admin",
       "name": "JeevaMitra admin (Flutter)",
-      "description": "Public native client (Authorization Code + PKCE via flutter_appauth). Redirect scheme is a placeholder until the app's package id is confirmed. Wired up in rollout step 5.",
+      "description": "Role container for JeevaMitra admin access. JeevaMitra is administered from SLC Central Admin (server-side, Firebase Admin SDK); there is no separate admin login.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
-      "standardFlowEnabled": true,
+      "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "redirectUris": [
-        "com.slcvet.jeevamitra.admin:/oauthredirect"
-      ],
+      "redirectUris": [],
       "webOrigins": [],
-      "attributes": {
-        "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "com.slcvet.jeevamitra.admin:/logout"
-      },
+      "attributes": {},
       "protocolMappers": [
         {
           "name": "jeevamitra-admin roles",
@@ -403,14 +408,14 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:3000/*"
+        "http://localhost:3002/*"
       ],
       "webOrigins": [
-        "http://localhost:3000"
+        "http://localhost:3002"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:3000/*"
+        "post.logout.redirect.uris": "http://localhost:3002/*"
       },
       "protocolMappers": [
         {
@@ -446,7 +451,7 @@
     {
       "clientId": "stock-admin",
       "name": "Stock Management admin",
-      "description": "Public SPA client; the Express backend validates access tokens (aud=stock-admin). Wired up in rollout step 3.",
+      "description": "Public SPA client (PKCE). The Express backend verifies the access token (aud=stock-admin) and issues its own session; Keycloak back-channel logout revokes it.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -454,14 +459,20 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:5175/*"
+        "http://localhost:3000/*",
+        "https://logitask.in/*",
+        "https://www.logitask.in/*"
       ],
       "webOrigins": [
-        "http://localhost:5175"
+        "http://localhost:3000",
+        "https://logitask.in",
+        "https://www.logitask.in"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5175/*"
+        "post.logout.redirect.uris": "http://localhost:3000/*##https://logitask.in/*##https://www.logitask.in/*",
+        "backchannel.logout.url": "http://host.docker.internal:5000/api/auth/sso/backchannel-logout",
+        "backchannel.logout.session.required": "true"
       },
       "protocolMappers": [
         {
@@ -497,22 +508,16 @@
     {
       "clientId": "nearsip-admin",
       "name": "NearSip admin (via Supabase Auth)",
-      "description": "Confidential client used by Supabase Auth's Keycloak provider. Redirect URI is a placeholder until the Supabase project URL is confirmed. Wired up in rollout step 5.",
+      "description": "Role container for NearSip admin access. NearSip is administered from SLC Central Admin (server-side, Supabase service role); there is no separate admin login.",
       "enabled": true,
       "protocol": "openid-connect",
-      "publicClient": false,
-      "clientAuthenticatorType": "client-secret",
-      "secret": "dev-only-nearsip-admin-secret-change-me",
-      "standardFlowEnabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "redirectUris": [
-        "https://YOUR-NEARSIP-PROJECT.supabase.co/auth/v1/callback"
-      ],
+      "redirectUris": [],
       "webOrigins": [],
-      "attributes": {
-        "pkce.code.challenge.method": "S256"
-      },
+      "attributes": {},
       "protocolMappers": [
         {
           "name": "nearsip-admin roles",
@@ -543,14 +548,14 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:3001/*"
+        "http://localhost:3003/*"
       ],
       "webOrigins": [
-        "http://localhost:3001"
+        "http://localhost:3003"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:3001/*"
+        "post.logout.redirect.uris": "http://localhost:3003/*"
       },
       "protocolMappers": [
         {

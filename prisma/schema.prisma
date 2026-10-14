@@ -52,6 +52,8 @@ model AdminUser {
   passwordHash String?
   /// Subject (`sub`) of the linked account in the central identity provider.
   oidcSubject  String?         @unique
+  /// Roles per SLC app (Keycloak client id → role names), synced at each SSO sign-in.
+  appRoles     Json            @default("{}")
   name         String?
   status       AdminUserStatus @default(ACTIVE)
   /// MFA extension point (Phase 2 architecture only — TOTP not implemented).

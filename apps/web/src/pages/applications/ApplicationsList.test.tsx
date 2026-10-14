@@ -63,6 +63,7 @@ const appAdmin: CurrentUser = {
   name: 'App Admin',
   status: 'ACTIVE',
   mfaEnabled: false,
+  appRoles: {},
   roles: ['APP_ADMIN'],
   permissions: ['applications.view', 'applications.manage'],
 };

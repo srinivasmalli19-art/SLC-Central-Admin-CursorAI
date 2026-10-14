@@ -602,6 +602,71 @@ code {
   margin-top: 6px;
 }
 
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 0 0 20px;
+}
+
+.kpi {
+  margin: 0;
+  padding: 14px 16px;
+}
+
+.kpi__label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpi__value {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi--warn {
+  border-left: 3px solid var(--warn);
+}
+
+.sidebar__section {
+  margin: 18px 12px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(203, 213, 225, 0.6);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.tabs__tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabs__tab--active {
+  color: var(--text);
+  border-bottom-color: var(--slc-primary);
+  font-weight: 600;
+}
+
 /* ---- Admin access + audit log ------------------------------------------------ */
 .page__lead {
   margin: -4px 0 16px;

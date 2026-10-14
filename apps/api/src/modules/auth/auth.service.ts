@@ -114,6 +114,7 @@ export async function getCurrentUser(adminUserId: string): Promise<CurrentUser |
     mfaEnabled: admin.mfaEnabled,
     roles: admin.roles,
     permissions: admin.permissions,
+    appRoles: admin.appRoles,
   };
 }
 

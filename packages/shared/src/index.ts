@@ -209,6 +209,8 @@ export interface CurrentUser {
   mfaEnabled: boolean;
   roles: RoleKey[];
   permissions: Permission[];
+  /** Roles held in each SLC app (Keycloak client id → roles), from the SLC sign-in. */
+  appRoles: Record<string, string[]>;
 }
 
 /**

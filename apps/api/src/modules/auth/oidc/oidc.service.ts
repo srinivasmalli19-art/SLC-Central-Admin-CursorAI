@@ -10,7 +10,8 @@ import {
   revokeSessionsByOidcSid,
   type SessionContext,
 } from '../session.service.js';
-import { displayNameFromClaims, extractRoleKeys } from './claims.js';
+import { config } from '../../../config/env.js';
+import { displayNameFromClaims, extractAppRoles, extractRoleKeys } from './claims.js';
 import { requireOidcSettings } from './oidcClient.js';
 
 /**
@@ -64,6 +65,7 @@ export async function completeSsoLogin(
   const roles = extractRoleKeys(claims, settings.rolesClaim);
   const name = displayNameFromClaims(claims);
   const sid = typeof claims.sid === 'string' ? claims.sid : undefined;
+  const appRoles = extractAppRoles(claims, config.keycloakAdmin?.managedApps.map((app) => app.clientId));
 
   const fail = (code: SsoErrorCode, reason: string, adminUserId?: string): never => {
     recordAuthEvent('ADMIN_SSO_LOGIN_FAILED', {
@@ -123,7 +125,10 @@ export async function completeSsoLogin(
   await syncRoles(admin.id, roles);
 
   // Keep profile fields in step with the IdP (email only if it stays unique).
-  const updates: { name?: string | null; email?: string; lastLoginAt: Date } = { lastLoginAt: new Date() };
+  const updates: { name?: string | null; email?: string; lastLoginAt: Date; appRoles: Record<string, string[]> } = {
+    lastLoginAt: new Date(),
+    appRoles,
+  };
   if (name && name !== admin.name) {
     updates.name = name;
   }
@@ -147,7 +152,7 @@ export async function completeSsoLogin(
     email,
     ipAddress: ctx.ipAddress,
     userAgent: ctx.userAgent,
-    metadata: { oidcSubject: subject, roles },
+    metadata: { oidcSubject: subject, roles, appRoles },
   });
 
   return { token, expiresAt, user };

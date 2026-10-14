@@ -179,3 +179,78 @@ Admin REST API (`test/fakeKeycloakAdmin.ts`): listing, inviting (with and
 without working email), role validation, partial role updates, all Super Admin
 safeguards, disable-signs-out-everywhere, and CSRF. `AdminAccess.test.tsx`
 covers the page.
+
+---
+
+# Steps 3–5: every SLC app's admin access through SLC
+
+| App | How admins get in | Where the work lives |
+| --- | --- | --- |
+| SLC Central Admin | SLC sign-in (OIDC, server-side) | this repo |
+| Stock Management | "Sign in with SLC Account" → app verifies the token, issues its own session | Stock-management-Web, branch `feat/slc-sso` |
+| Pasumithra admin portal | "Sign in with SLC Account" → **Firebase bridge** (this API) → Firebase custom token | pasumithra-Web-application, branch `feat/slc-sso` |
+| JeevaMitra | Managed **inside Central Admin** (no admin UI in the app) | this repo + rules fix in Jeevamitra |
+| NearSip | Managed **inside Central Admin**; in-app admin with hardcoded password removed | this repo + NearSip branch |
+| Pasunestam | "Sign in with SLC Account" for editors/admins (server-side, Next.js) | pasunestam, branch `feat/slc-sso` |
+
+## Per-app roles inside Central Admin
+
+The `central-admin` client now also puts every app's roles in the ID token
+(`resource_access.<client>.roles`). They are saved on the admin at each SSO
+sign-in (`admin_user.appRoles`, migration `20261014130000_admin_app_roles`)
+and checked by `requireAppRole(clientId, roles)`. Central Admin roles alone do
+not grant access to an app's data: a person needs a role in that app.
+
+## Firebase bridge (`modules/bridge`)
+
+`POST /api/v1/bridge/firebase/:clientId/token` takes an SLC access token
+issued to that app's client, verifies it, and returns a Firebase custom token
+for `slc:<sub>` with `slc_admin`, `slc_roles`, `slc_email` claims. Per-app CORS
+allow-list. `POST /api/v1/bridge/firebase/:clientId/backchannel-logout`
+revokes that person's Firebase refresh tokens; disabling or signing someone out
+in Admin access does the same for every bridged project.
+
+```
+FIREBASE_SA_PASUMITHRA=<base64 service account JSON>
+FIREBASE_SA_JEEVAMITRA=<base64 service account JSON>
+FIREBASE_BRIDGE_APPS=[
+  {"clientId":"pasumithra-admin","serviceAccountEnv":"FIREBASE_SA_PASUMITHRA","origins":["https://<pasumithra admin portal>"]},
+  {"clientId":"jeevamitra-admin","serviceAccountEnv":"FIREBASE_SA_JEEVAMITRA"}
+]
+```
+
+An entry without `origins` is used only for server-side management (JeevaMitra).
+
+## JeevaMitra (`/apps/jeevamitra`)
+
+| SLC role (`jeevamitra-admin`) | Can |
+| --- | --- |
+| viewer | see counts, users, vets, disease alerts |
+| admin | + verify / unverify vets (account **and** public vet profile), deactivate / reactivate disease alerts |
+| super_admin | + disable a user's Firebase account (also signs them out) |
+
+## NearSip (`/apps/nearsip`)
+
+Uses Supabase REST with the service-role key (server only):
+
+```
+NEARSIP_SUPABASE_URL=https://<project>.supabase.co
+NEARSIP_SUPABASE_SERVICE_ROLE_KEY=<service role key>
+```
+
+| SLC role (`nearsip-admin`) | Can |
+| --- | --- |
+| viewer | see counts, places, reviews, users |
+| admin | + add / edit / delete places, delete reviews |
+| super_admin | + disable / enable a user (Supabase ban, reversible) |
+
+Place edits accept only the fields the old in-app admin edited (`name`, `type`,
+`address`, `latitude`, `longitude`, `rating`, `is_hotspot`, `is_verified`,
+`is_popular`).
+
+## Tests
+
+`firebaseBridge.test.ts` (real custom-token signing with a generated service
+account, CORS, forged/other-app tokens, back-channel logout) and
+`apps/appModules.test.ts` (JeevaMitra with an in-memory store, NearSip against a
+fake Supabase REST server; role gating, auditing, input allow-list).

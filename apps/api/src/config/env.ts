@@ -98,6 +98,21 @@ const envSchema = z.object({
   /** Whether to ask Keycloak to email new admins a set-password/MFA link. */
   KEYCLOAK_SEND_INVITE_EMAIL: booleanFromString.default('true'),
 
+  // ---- Firebase bridge (SSO for Firebase-backed SLC apps) ----------------
+  /**
+   * JSON array describing Firebase apps whose admins sign in with SLC:
+   * [{"clientId":"pasumithra-admin","serviceAccountEnv":"FIREBASE_SA_PASUMITHRA",
+   *   "origins":["https://admin.pasumitra.example"]}]
+   * Each service account (JSON, or base64 JSON) is read from its named env var.
+   */
+  FIREBASE_BRIDGE_APPS: z.string().default('[]'),
+
+  // ---- NearSip (Supabase) management -------------------------------------
+  /** NearSip Supabase project URL, e.g. https://xyz.supabase.co */
+  NEARSIP_SUPABASE_URL: z.string().url().optional(),
+  /** Service-role key (server only; bypasses RLS). Never sent to a browser. */
+  NEARSIP_SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
+
   // ---- Bootstrap (dev-only) super admin ----------------------------------
   BOOTSTRAP_ADMIN_EMAIL: z.string().email().optional(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),
@@ -133,6 +148,15 @@ export interface KeycloakAdminConfig {
   sendInviteEmail: boolean;
 }
 
+export interface FirebaseBridgeApp {
+  /** Keycloak client id of the app, e.g. pasumithra-admin. */
+  clientId: string;
+  /** Parsed Firebase service account (never logged, never sent anywhere). */
+  serviceAccount: { project_id: string; client_email: string; private_key: string };
+  /** Browser origins allowed to call the bridge for this app. */
+  origins: string[];
+}
+
 export interface AppConfig {
   nodeEnv: RawEnv['NODE_ENV'];
   isProduction: boolean;
@@ -153,6 +177,10 @@ export interface AppConfig {
   oidc: OidcConfig | null;
   /** Keycloak Admin API settings; null when central identity management is off. */
   keycloakAdmin: KeycloakAdminConfig | null;
+  /** NearSip Supabase project for server-side management; null when not connected. */
+  nearsip: { url: string; serviceRoleKey: string } | null;
+  /** Firebase apps whose admins sign in through SLC (see modules/bridge). */
+  firebaseBridge: FirebaseBridgeApp[];
   /** Whether `POST /auth/login` (email + password) is accepted. */
   passwordLoginEnabled: boolean;
   integration: { egressAllowlist: string[] };
@@ -233,6 +261,51 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     })
     .filter((app) => /^[A-Za-z0-9._-]{1,64}$/.test(app.clientId));
 
+  // Firebase bridge: validated here so a broken service account fails at boot.
+  const firebaseBridge: FirebaseBridgeApp[] = [];
+  let bridgeEntries: unknown = [];
+  try {
+    bridgeEntries = JSON.parse(env.FIREBASE_BRIDGE_APPS);
+  } catch {
+    errors.push('FIREBASE_BRIDGE_APPS: must be a JSON array');
+  }
+  if (!Array.isArray(bridgeEntries)) {
+    errors.push('FIREBASE_BRIDGE_APPS: must be a JSON array');
+    bridgeEntries = [];
+  }
+  for (const [index, entry] of (bridgeEntries as Record<string, unknown>[]).entries()) {
+    const where = `FIREBASE_BRIDGE_APPS[${index}]`;
+    const clientId = typeof entry?.clientId === 'string' ? entry.clientId : '';
+    const saEnv = typeof entry?.serviceAccountEnv === 'string' ? entry.serviceAccountEnv : '';
+    const origins = Array.isArray(entry?.origins) ? entry.origins.filter((o): o is string => typeof o === 'string') : [];
+    if (!/^[A-Za-z0-9._-]{1,64}$/.test(clientId) || !saEnv) {
+      errors.push(`${where}: needs clientId and serviceAccountEnv`);
+      continue;
+    }
+    const rawSa = source[saEnv];
+    if (!rawSa) {
+      errors.push(`${where}: environment variable ${saEnv} is not set`);
+      continue;
+    }
+    try {
+      const text = rawSa.trim().startsWith('{') ? rawSa : Buffer.from(rawSa, 'base64').toString('utf8');
+      const sa = JSON.parse(text) as Record<string, unknown>;
+      if (typeof sa.project_id !== 'string' || typeof sa.client_email !== 'string' || typeof sa.private_key !== 'string') {
+        throw new Error('incomplete');
+      }
+      firebaseBridge.push({
+        clientId,
+        serviceAccount: { project_id: sa.project_id, client_email: sa.client_email, private_key: sa.private_key },
+        origins,
+      });
+    } catch {
+      errors.push(`${where}: ${saEnv} is not a valid Firebase service account JSON`);
+    }
+  }
+  if (firebaseBridge.length > 0 && !oidcEnabled) {
+    errors.push('FIREBASE_BRIDGE_APPS: requires OIDC_ISSUER_URL (tokens are verified against it)');
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `Invalid environment configuration:\n${errors.map((e) => `  - ${e}`).join('\n')}`,
@@ -290,6 +363,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
             managedApps,
             sendInviteEmail: env.KEYCLOAK_SEND_INVITE_EMAIL,
           }
+        : null,
+    firebaseBridge,
+    nearsip:
+      env.NEARSIP_SUPABASE_URL && env.NEARSIP_SUPABASE_SERVICE_ROLE_KEY
+        ? { url: env.NEARSIP_SUPABASE_URL.replace(/\/$/, ''), serviceRoleKey: env.NEARSIP_SUPABASE_SERVICE_ROLE_KEY }
         : null,
     passwordLoginEnabled,
     integration: {

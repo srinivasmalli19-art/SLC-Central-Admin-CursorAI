@@ -10,6 +10,26 @@ export interface ResolvedAdmin {
   mfaEnabled: boolean;
   roles: RoleKey[];
   permissions: Permission[];
+  /** Roles per SLC app (Keycloak client id → roles), synced at SSO sign-in. */
+  appRoles: Record<string, string[]>;
+}
+
+/** Normalise the stored JSON into a clean client → roles map. */
+export function parseAppRoles(value: unknown): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const [clientId, roles] of Object.entries(value as Record<string, unknown>)) {
+    if (Array.isArray(roles)) {
+      const clean = roles.filter((r): r is string => typeof r === 'string');
+      if (clean.length > 0) out[clientId] = [...new Set(clean)].sort();
+    }
+  }
+  return out;
+}
+
+/** Whether the admin holds any of `roles` in the given SLC app. */
+export function hasAppRole(admin: Pick<ResolvedAdmin, 'appRoles'>, clientId: string, roles: readonly string[]): boolean {
+  return (admin.appRoles[clientId] ?? []).some((role) => roles.includes(role));
 }
 
 /**
@@ -46,6 +66,7 @@ export async function resolveAdmin(adminUserId: string): Promise<ResolvedAdmin |
     mfaEnabled: admin.mfaEnabled,
     roles,
     permissions: [...permissions],
+    appRoles: parseAppRoles(admin.appRoles),
   };
 }
 

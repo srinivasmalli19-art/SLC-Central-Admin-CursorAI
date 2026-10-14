@@ -7,6 +7,9 @@ import { applicationsRouter } from '../modules/applications/applications.routes.
 import { integrationsRouter } from '../modules/integrations/integrations.routes.js';
 import { identityRouter } from '../modules/identity/identity.routes.js';
 import { auditRouter } from '../modules/audit/audit.routes.js';
+import { bridgeRouter } from '../modules/bridge/bridge.routes.js';
+import { jeevamitraRouter } from '../modules/apps/jeevamitra/jeevamitra.routes.js';
+import { nearsipRouter } from '../modules/apps/nearsip/nearsip.routes.js';
 
 /**
  * Versioned API router (`/api/v1`).
@@ -23,3 +26,6 @@ v1Router.use('/', applicationsRouter);
 v1Router.use('/', integrationsRouter);
 v1Router.use('/', identityRouter);
 v1Router.use('/', auditRouter);
+v1Router.use('/', bridgeRouter);
+v1Router.use('/', jeevamitraRouter);
+v1Router.use('/', nearsipRouter);

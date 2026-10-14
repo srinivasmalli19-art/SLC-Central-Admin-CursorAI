@@ -36,9 +36,20 @@ interface TestAccount {
   email_verified: boolean;
   name: string;
   roles: string[];
+  resource_access?: Record<string, { roles: string[] }>;
 }
 const accounts: Record<string, TestAccount> = {
-  'kc-super': { email: 'super@slc.test', email_verified: true, name: 'Super Admin', roles: ['SUPER_ADMIN'] },
+  'kc-super': {
+    email: 'super@slc.test',
+    email_verified: true,
+    name: 'Super Admin',
+    roles: ['SUPER_ADMIN'],
+    resource_access: {
+      'central-admin': { roles: ['SUPER_ADMIN'] },
+      'jeevamitra-admin': { roles: ['admin'] },
+      'nearsip-admin': { roles: ['viewer'] },
+    },
+  },
   'kc-support': {
     email: 'support@slc.test',
     email_verified: true,
@@ -150,7 +161,7 @@ beforeAll(async () => {
     ],
     jwks: { keys: [signingJwk] },
     cookies: { keys: ['test-cookie-key'] },
-    claims: { openid: ['sub', 'roles'], email: ['email', 'email_verified'], profile: ['name'] },
+    claims: { openid: ['sub', 'roles', 'resource_access'], email: ['email', 'email_verified'], profile: ['name'] },
     conformIdTokenClaims: false,
     ttl: { Interaction: 600, Grant: 600, Session: 3600, AccessToken: 300, IdToken: 300 },
     features: {
@@ -252,6 +263,11 @@ describe('Central SSO sign-in (OIDC)', () => {
     expect(me.status).toBe(200);
     expect(me.body.data.user).toMatchObject({ email: 'super@slc.test', name: 'Super Admin', roles: ['SUPER_ADMIN'] });
     expect(me.body.data.user.permissions).toContain('admin_users.manage');
+    expect(me.body.data.user.appRoles).toEqual({
+      'central-admin': ['SUPER_ADMIN'],
+      'jeevamitra-admin': ['admin'],
+      'nearsip-admin': ['viewer'],
+    });
 
     expect(state.users).toHaveLength(1);
     expect(state.users[0]).toMatchObject({ oidcSubject: 'kc-super', passwordHash: null });
