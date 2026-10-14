@@ -319,3 +319,35 @@ verifier, last-Super-Admin guard, disable signs out everywhere).
 
    Any app added later must get the same client settings; copy an existing app
    client in `realm-slc.json`.
+
+---
+
+# Break-glass password sign-in (backup)
+
+Central Admin keeps an email + password form as a backup for when Keycloak is
+down. Because one Central Admin account can reach every SLC app, the backup is
+locked down; in production/staging the server refuses to start unless:
+
+| Setting | Rule |
+| --- | --- |
+| `PASSWORD_LOGIN_ALLOWED_EMAILS` | Only these accounts may use the password form (everyone else gets the normal "invalid email or password"). Keep it to one or two people. |
+| `PASSWORD_LOGIN_REQUIRE_MFA` | Stays on: a 6-digit authenticator code is required after the password. |
+| `MFA_ENCRYPTION_KEY` | 32 random bytes (`openssl rand -base64 32`); encrypts authenticator secrets in the database. |
+| `BREAK_GLASS_SESSION_HOURS` | Default 2 (normal sessions: 12). |
+
+Every break-glass sign-in is written to the audit log as
+`ADMIN_BREAK_GLASS_LOGIN`; failures record why (wrong password, not on the
+list, missing or wrong code). A code works only once.
+
+## Setting up a break-glass account
+
+On the server, with the production environment loaded:
+
+```bash
+npm run -w @slc/api db:seed                         # once
+BOOTSTRAP_ADMIN_EMAIL=ops@slcvet.com npm run -w @slc/api bootstrap:admin -- --allow-production
+npm run -w @slc/api mfa:enroll -- ops@slcvet.com    # scan the key into an authenticator app
+```
+
+Lost phone: `npm run -w @slc/api mfa:enroll -- ops@slcvet.com --reset`.
+Enrolment needs server access on purpose; there is no web page for it.

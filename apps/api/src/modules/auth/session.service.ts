@@ -26,10 +26,13 @@ export async function createSession(
   adminUserId: string,
   ctx: SessionContext = {},
   sso: SsoSessionData = {},
+  /** Shorter lifetime for this session (e.g. break-glass); defaults to SESSION_TTL_HOURS. */
+  ttlHours?: number,
 ): Promise<IssuedSession> {
   const prisma = requirePrisma();
   const token = generateOpaqueToken();
-  const expiresAt = new Date(Date.now() + config.cookie.ttlHours * 60 * 60 * 1000);
+  const hours = Math.min(ttlHours ?? config.cookie.ttlHours, config.cookie.ttlHours);
+  const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
 
   await prisma.adminSession.create({
     data: {

@@ -109,8 +109,8 @@ export function fetchHealth(): Promise<HealthResponse> {
 }
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post<{ user: CurrentUser; csrfToken: string }>('/auth/login', { email, password }),
+  login: (email: string, password: string, otp?: string) =>
+    api.post<{ user: CurrentUser; csrfToken: string }>('/auth/login', otp ? { email, password, otp } : { email, password }),
   logout: () => api.post<LogoutResult>('/auth/logout'),
   me: () => api.get<{ user: CurrentUser | null }>('/auth/me'),
   options: () => api.get<AuthOptions>('/auth/config'),

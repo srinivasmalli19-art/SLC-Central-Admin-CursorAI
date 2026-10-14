@@ -9,7 +9,7 @@ type AuthStatus = 'initializing' | 'authenticated' | 'unauthenticated';
 interface AuthContextValue {
   status: AuthStatus;
   user: CurrentUser | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, otp?: string) => Promise<void>;
   logout: () => Promise<void>;
   /** UX-only permission check. The backend remains authoritative. */
   can: (permission: Permission) => boolean;
@@ -48,8 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { user: current } = await authApi.login(email, password);
+  const login = useCallback(async (email: string, password: string, otp?: string) => {
+    const { user: current } = await authApi.login(email, password, otp);
     setUser(current);
     setStatus('authenticated');
   }, []);

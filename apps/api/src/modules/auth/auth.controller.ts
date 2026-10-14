@@ -20,8 +20,8 @@ export async function loginController(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { email, password } = req.body as { email: string; password: string };
-    const result = await login(email, password, requestContext(req));
+    const { email, password, otp } = req.body as { email: string; password: string; otp?: string };
+    const result = await login(email, password, requestContext(req), otp);
 
     setSessionCookie(res, result.token, result.expiresAt);
     const csrfToken = issueCsrfCookie(res);

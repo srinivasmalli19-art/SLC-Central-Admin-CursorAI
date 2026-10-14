@@ -77,6 +77,18 @@ const envSchema = z.object({
    * true when SSO is not configured and false when it is.
    */
   PASSWORD_LOGIN_ENABLED: booleanFromString.optional(),
+  /**
+   * Break-glass accounts: comma-separated emails allowed to use the email +
+   * password form. Required in production/staging when SSO is on. Everyone
+   * else signs in with SSO.
+   */
+  PASSWORD_LOGIN_ALLOWED_EMAILS: z.string().default(''),
+  /** Require an authenticator code for password sign-in (default: on in production/staging). */
+  PASSWORD_LOGIN_REQUIRE_MFA: booleanFromString.optional(),
+  /** Session length for password (break-glass) sign-ins, in hours. */
+  BREAK_GLASS_SESSION_HOURS: z.coerce.number().positive().max(24).default(2),
+  /** 32-byte key (base64) that encrypts authenticator secrets at rest. */
+  MFA_ENCRYPTION_KEY: z.string().optional(),
 
   // ---- Central identity management (Keycloak Admin API) -------------------
   /** Keycloak base URL, e.g. https://id.slcvet.com (defaults from OIDC_ISSUER_URL). */
@@ -183,6 +195,15 @@ export interface AppConfig {
   firebaseBridge: FirebaseBridgeApp[];
   /** Whether `POST /auth/login` (email + password) is accepted. */
   passwordLoginEnabled: boolean;
+  /** Break-glass password sign-in rules. */
+  breakGlass: {
+    /** Lower-cased emails allowed to use password sign-in; empty = any local account. */
+    allowedEmails: string[];
+    requireMfa: boolean;
+    sessionHours: number;
+    /** Encryption key for authenticator secrets, or null when not configured. */
+    mfaKey: string | null;
+  };
   integration: { egressAllowlist: string[] };
 }
 
@@ -236,6 +257,24 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   const passwordLoginEnabled = env.PASSWORD_LOGIN_ENABLED ?? !oidcEnabled;
   if (!oidcEnabled && !passwordLoginEnabled) {
     errors.push('PASSWORD_LOGIN_ENABLED: cannot be false unless OIDC is configured (no way to sign in)');
+  }
+  const allowedEmails = env.PASSWORD_LOGIN_ALLOWED_EMAILS.split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const requireMfa = env.PASSWORD_LOGIN_REQUIRE_MFA ?? isDeployed;
+  if (isDeployed && oidcEnabled && passwordLoginEnabled && allowedEmails.length === 0) {
+    errors.push(
+      'PASSWORD_LOGIN_ALLOWED_EMAILS: list the break-glass accounts allowed to use password sign-in in production/staging',
+    );
+  }
+  if (isDeployed && passwordLoginEnabled && !requireMfa) {
+    errors.push('PASSWORD_LOGIN_REQUIRE_MFA: must stay on in production/staging while password sign-in is enabled');
+  }
+  if (env.MFA_ENCRYPTION_KEY !== undefined && Buffer.from(env.MFA_ENCRYPTION_KEY, 'base64').length !== 32) {
+    errors.push('MFA_ENCRYPTION_KEY: must be 32 bytes, base64-encoded (openssl rand -base64 32)');
+  }
+  if (passwordLoginEnabled && requireMfa && !env.MFA_ENCRYPTION_KEY) {
+    errors.push('MFA_ENCRYPTION_KEY: required when password sign-in needs an authenticator code');
   }
 
   // Central identity management needs a service account and a realm location.
@@ -370,6 +409,12 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
         ? { url: env.NEARSIP_SUPABASE_URL.replace(/\/$/, ''), serviceRoleKey: env.NEARSIP_SUPABASE_SERVICE_ROLE_KEY }
         : null,
     passwordLoginEnabled,
+    breakGlass: {
+      allowedEmails,
+      requireMfa,
+      sessionHours: env.BREAK_GLASS_SESSION_HOURS,
+      mfaKey: env.MFA_ENCRYPTION_KEY ?? null,
+    },
     integration: {
       egressAllowlist: env.INTEGRATION_EGRESS_ALLOWLIST.split(',')
         .map((h) => h.trim())

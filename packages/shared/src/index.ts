@@ -229,7 +229,9 @@ export type AuthEventType =
   | 'ADMIN_SSO_LOGIN_FAILED'
   | 'ADMIN_SSO_PROVISIONED'
   | 'ADMIN_SSO_LINKED'
-  | 'ADMIN_SSO_BACKCHANNEL_LOGOUT';
+  | 'ADMIN_SSO_BACKCHANNEL_LOGOUT'
+  | 'ADMIN_BREAK_GLASS_LOGIN'
+  | 'ADMIN_MFA_ENROLLED';
 
 /** Public sign-in options, as returned by `GET /api/v1/auth/config`. */
 export interface AuthOptions {

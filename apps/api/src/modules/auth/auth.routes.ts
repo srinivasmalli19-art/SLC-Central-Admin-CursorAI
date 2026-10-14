@@ -43,6 +43,8 @@ const loginRateLimiter = rateLimit({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  /** Authenticator code, when the account has one. */
+  otp: z.string().regex(/^\d{6}$/).optional(),
 });
 
 const changePasswordSchema = z.object({

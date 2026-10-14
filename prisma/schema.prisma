@@ -58,6 +58,11 @@ model AdminUser {
   status       AdminUserStatus @default(ACTIVE)
   /// MFA extension point (Phase 2 architecture only — TOTP not implemented).
   mfaEnabled   Boolean         @default(false)
+  /// Authenticator (TOTP) secret for break-glass password sign-in, encrypted
+  /// with MFA_ENCRYPTION_KEY. SSO admins use Keycloak's MFA instead.
+  mfaSecret       String?
+  /// Last accepted TOTP time step, so a code cannot be used twice.
+  mfaLastUsedStep Int?
   lastLoginAt  DateTime?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
