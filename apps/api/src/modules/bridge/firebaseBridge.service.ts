@@ -92,6 +92,12 @@ export async function exchangeForFirebaseToken(
   ctx: { ipAddress?: string; userAgent?: string } = {},
 ): Promise<BridgeTokenResult> {
   const bridge = requireBridgeApp(clientId);
+  // Entries without browser origins are for server-side management only
+  // (e.g. JeevaMitra); never mint sign-in tokens for them. CORS alone would
+  // not stop a non-browser caller.
+  if (bridge.origins.length === 0) {
+    throw new AppError(404, 'BRIDGE_APP_NOT_FOUND', 'This app is not connected to SLC sign-in.');
+  }
 
   let claims: JWTPayload;
   try {

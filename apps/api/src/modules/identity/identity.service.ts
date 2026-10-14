@@ -272,15 +272,21 @@ export async function inviteUser(
 
 export async function setUserAppRoles(userId: string, appRoles: AppRoleMap, actor: ActorContext): Promise<IdentityUser> {
   const before = await getUser(userId);
-  const hadSuper = (before.appRoles[CENTRAL_ADMIN_CLIENT] ?? []).includes(SUPER_ADMIN_ROLE);
+  const supersBefore = await superAdminIds();
+  // Super Admin directly or through a group (e.g. /slc-super-admins).
+  const hadSuper = (before.appRoles[CENTRAL_ADMIN_CLIENT] ?? []).includes(SUPER_ADMIN_ROLE) || supersBefore.has(userId);
   const touchesCentral = CENTRAL_ADMIN_CLIENT in appRoles;
   const wantsSuper = (appRoles[CENTRAL_ADMIN_CLIENT] ?? []).includes(SUPER_ADMIN_ROLE);
 
   if (hadSuper || (touchesCentral && wantsSuper)) {
     requireSystemManage(actor, 'Only a Super Admin can change a Super Admin or grant that role.');
   }
-  if (hadSuper && touchesCentral && !wantsSuper) {
-    const supers = await superAdminIds();
+  if ((await actorSubject(actor)) === userId) {
+    requireSystemManage(actor, 'You cannot change your own access. Ask a Super Admin.');
+  }
+  const directSuper = (before.appRoles[CENTRAL_ADMIN_CLIENT] ?? []).includes(SUPER_ADMIN_ROLE);
+  if (directSuper && touchesCentral && !wantsSuper) {
+    const supers = new Set(supersBefore);
     supers.delete(userId);
     if (supers.size === 0) {
       throw new AppError(409, 'LAST_SUPER_ADMIN', 'This is the last Super Admin; grant the role to someone else first.');
@@ -290,6 +296,15 @@ export async function setUserAppRoles(userId: string, appRoles: AppRoleMap, acto
   const resolved = await validateAppRoles(appRoles);
   const { added, removed } = await applyAppRoles(userId, resolved);
 
+  // Roles are read at sign-in. When access is removed, end the person's
+  // Central Admin sessions so the removal applies now, not at next sign-in.
+  let localSessionsRevoked = 0;
+  if (removed.length > 0) {
+    const prisma = getPrisma();
+    const local = prisma ? await prisma.adminUser.findUnique({ where: { oidcSubject: userId }, select: { id: true } }) : null;
+    if (local) localSessionsRevoked = await revokeAllSessions(local.id);
+  }
+
   if (added.length > 0 || removed.length > 0) {
     await writeAuditLog({
       action: 'IDENTITY_ROLES_CHANGED',
@@ -297,7 +312,7 @@ export async function setUserAppRoles(userId: string, appRoles: AppRoleMap, acto
       actorEmail: actor.admin.email,
       targetType: 'IdentityUser',
       targetId: userId,
-      metadata: { email: before.email, added, removed },
+      metadata: { email: before.email, added, removed, localSessionsRevoked },
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
     });

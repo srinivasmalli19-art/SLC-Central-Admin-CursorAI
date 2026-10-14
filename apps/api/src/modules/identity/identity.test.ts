@@ -261,6 +261,42 @@ describe('central identity management', () => {
     expect(kc.users[0]!.enabled).toBe(true);
   });
 
+  it('treats a group Super Admin as a Super Admin and blocks editing your own access', async () => {
+    db = createFakePrisma(ROLE_KEYS, {
+      ...ROLE_PERMISSIONS,
+      APP_ADMIN: [...ROLE_PERMISSIONS.APP_ADMIN, 'admin_users.view', 'admin_users.manage'],
+    });
+    fake.prisma = db.prisma;
+    const groupSuper = kc.addUser({ email: 'chief@slc.test', groups: ['slc-super-admins'] });
+    const me = kc.addUser({ email: 'manager@slc.test', roles: { 'stock-admin': ['viewer'] } });
+    const { cookie } = await signedIn(['APP_ADMIN'], 'manager@slc.test', me.id);
+    const put = (id: string, appRoles: object) =>
+      request(app).put(`/api/v1/identity/users/${id}/roles`).set('Cookie', cookie).set('X-CSRF-Token', CSRF).send({ appRoles });
+
+    expect((await put(groupSuper.id, { 'stock-admin': ['viewer'] })).status).toBe(403);
+    const self = await put(me.id, { 'pasumithra-admin': ['super_admin'] });
+    expect(self.status).toBe(403);
+    expect(self.body.error.message).toMatch(/own access/);
+  });
+
+  it('removing a role ends that person\'s Central Admin sessions right away', async () => {
+    const ravi = kc.addUser({ email: 'ravi@slc.test', roles: { 'central-admin': ['SUPPORT_ADMIN'], 'stock-admin': ['admin'] } });
+    const raviSession = await signedIn(['SUPPORT_ADMIN'], 'ravi@slc.test', ravi.id);
+    const { cookie } = await signedIn(['SUPER_ADMIN'], 'boss@slc.test');
+
+    // Adding a role does not sign them out.
+    await request(app).put(`/api/v1/identity/users/${ravi.id}/roles`).set('Cookie', cookie).set('X-CSRF-Token', CSRF)
+      .send({ appRoles: { 'pasumithra-admin': ['viewer'] } });
+    expect((await request(app).get('/api/v1/auth/me').set('Cookie', raviSession.cookie)).status).toBe(200);
+
+    // Removing one does.
+    const res = await request(app).put(`/api/v1/identity/users/${ravi.id}/roles`).set('Cookie', cookie).set('X-CSRF-Token', CSRF)
+      .send({ appRoles: { 'stock-admin': [] } });
+    expect(res.status).toBe(200);
+    expect((await request(app).get('/api/v1/auth/me').set('Cookie', raviSession.cookie)).status).toBe(401);
+    expect(db.state.auditLogs.at(-1)).toMatchObject({ action: 'IDENTITY_ROLES_CHANGED', metadata: { localSessionsRevoked: 1 } });
+  });
+
   it('requires the CSRF token for changes', async () => {
     const ravi = kc.addUser({ email: 'ravi@slc.test' });
     const { cookie } = await signedIn(['SUPER_ADMIN'], 'boss@slc.test');

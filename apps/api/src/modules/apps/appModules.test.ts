@@ -251,6 +251,15 @@ describe('JeevaMitra from Central Admin', () => {
   });
 });
 
+describe('Firebase bridge scope', () => {
+  it('never issues sign-in tokens for management-only apps (no browser origins)', async () => {
+    const res = await request(app)
+      .post('/api/v1/bridge/firebase/jeevamitra-admin/token')
+      .send({ accessToken: 'x'.repeat(40) });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe('NearSip from Central Admin', () => {
   it('reads counts and searches places with the service-role key (server side only)', async () => {
     const cookie = await signedIn({ 'nearsip-admin': ['viewer'] });
