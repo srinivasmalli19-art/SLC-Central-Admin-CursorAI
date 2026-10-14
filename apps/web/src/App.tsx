@@ -14,6 +14,7 @@ import { ApplicationForm } from './pages/applications/ApplicationForm';
 import { AdminAccess } from './pages/admin-access/AdminAccess';
 import { AuditLogs } from './pages/audit/AuditLogs';
 import { JeevaMitraPage } from './pages/apps/JeevaMitraPage';
+import { PasunestamPage } from './pages/apps/PasunestamPage';
 import { NearSipPage } from './pages/apps/NearSipPage';
 import { RequireAppRole } from './pages/apps/RequireAppRole';
 
@@ -91,6 +92,14 @@ export function App() {
             element={
               <RequireAppRole clientId="jeevamitra-admin" appName="JeevaMitra">
                 <JeevaMitraPage />
+              </RequireAppRole>
+            }
+          />
+          <Route
+            path="apps/pasunestam"
+            element={
+              <RequireAppRole clientId="pasunestam-admin" appName="Pasunestam" roles={['editor', 'manager']}>
+                <PasunestamPage />
               </RequireAppRole>
             }
           />

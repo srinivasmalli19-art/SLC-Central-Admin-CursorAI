@@ -229,6 +229,23 @@ An entry without `origins` is used only for server-side management (JeevaMitra).
 | manager | + verify / unverify vets (account **and** public vet profile), deactivate / reactivate disease alerts |
 | super_admin | + disable a user's Firebase account (also signs them out) |
 
+## Pasunestam (`/apps/pasunestam`)
+
+Pasunestam's own Firebase project, through the `pasunestam-admin` entry in
+`FIREBASE_BRIDGE_APPS` (service account `FIREBASE_SA_PASUNESTAM`, server only).
+The same SLC roles that sign staff in to the Pasunestam site decide access here:
+
+| SLC role (`pasunestam-admin`) | Can |
+| --- | --- |
+| editor | overview; review vet case submissions (publish / reject; only published cases are public); find certificates by number and cancel issued ones with a reason; see templates and scheme forms |
+| manager | + vet accounts (disable / enable, also signs them out), make certificate templates available or hidden, remove scheme forms (and their file), see scheme applications (farmers' phone numbers) |
+
+Writes use the same fields as the Pasunestam app, plus `reviewedBy` /
+`cancelledBy` = `SLC Central Admin: <email>`. Every change is in the audit log.
+Staff accounts (`slc:` ids) are never touched here; they are managed in Admin
+access. A cancelled certificate stops verifying on Pasunestam's public verify
+page, as with a cancellation made in the app.
+
 ## NearSip (`/apps/nearsip`)
 
 Uses Supabase REST with the service-role key (server only):

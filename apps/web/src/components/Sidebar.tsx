@@ -4,11 +4,12 @@ import { NAV_MODULES } from '@slc/shared';
 import { useAuth } from '../auth/AuthContext';
 
 /** SLC apps administered inside Central Admin, shown to admins with a role in that app. */
+const STANDARD_APP_ROLES = ['viewer', 'manager', 'super_admin'] as const;
 export const MANAGED_APP_PAGES = [
-  { clientId: 'jeevamitra-admin', label: 'JeevaMitra', path: '/apps/jeevamitra' },
-  { clientId: 'nearsip-admin', label: 'NearSip', path: '/apps/nearsip' },
+  { clientId: 'jeevamitra-admin', label: 'JeevaMitra', path: '/apps/jeevamitra', roles: STANDARD_APP_ROLES },
+  { clientId: 'nearsip-admin', label: 'NearSip', path: '/apps/nearsip', roles: STANDARD_APP_ROLES },
+  { clientId: 'pasunestam-admin', label: 'Pasunestam', path: '/apps/pasunestam', roles: ['editor', 'manager'] as const },
 ] as const;
-const ANY_APP_ROLE = ['viewer', 'manager', 'super_admin'];
 
 interface SidebarProps {
   open: boolean;
@@ -22,7 +23,7 @@ interface SidebarProps {
  */
 export function Sidebar({ open, onNavigate }: SidebarProps) {
   const { can, hasAppRole } = useAuth();
-  const appPages = MANAGED_APP_PAGES.filter((page) => hasAppRole(page.clientId, ANY_APP_ROLE));
+  const appPages = MANAGED_APP_PAGES.filter((page) => hasAppRole(page.clientId, page.roles));
 
   const visibleModules = NAV_MODULES.filter(
     (module) => !module.permission || can(module.permission),

@@ -811,3 +811,9 @@ code {
     background: rgba(15, 23, 42, 0.4);
   }
 }
+
+.case-body {
+  white-space: pre-wrap;
+  max-width: 60ch;
+  margin: 8px 0 0;
+}

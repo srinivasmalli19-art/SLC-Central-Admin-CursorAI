@@ -9,6 +9,7 @@ import { identityRouter } from '../modules/identity/identity.routes.js';
 import { auditRouter } from '../modules/audit/audit.routes.js';
 import { bridgeRouter } from '../modules/bridge/bridge.routes.js';
 import { jeevamitraRouter } from '../modules/apps/jeevamitra/jeevamitra.routes.js';
+import { pasunestamRouter } from '../modules/apps/pasunestam/pasunestam.routes.js';
 import { nearsipRouter } from '../modules/apps/nearsip/nearsip.routes.js';
 
 /**
@@ -28,4 +29,5 @@ v1Router.use('/', identityRouter);
 v1Router.use('/', auditRouter);
 v1Router.use('/', bridgeRouter);
 v1Router.use('/', jeevamitraRouter);
+v1Router.use('/', pasunestamRouter);
 v1Router.use('/', nearsipRouter);

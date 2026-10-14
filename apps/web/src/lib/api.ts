@@ -238,3 +238,103 @@ export const nearsipApi = {
   setUserDisabled: (id: string, disabled: boolean) =>
     api.post<{ id: string; disabled: boolean }>(`/apps/nearsip/users/${encodeURIComponent(id)}/account`, { disabled }),
 };
+
+// ---- Pasunestam ----------------------------------------------------------------
+export interface PnSummary {
+  vets: number;
+  staff: number;
+  certificatesIssued: number;
+  certificatesCancelled: number;
+  certificatesDraft: number;
+  casesAwaitingReview: number;
+  casesPublished: number;
+  templates: number;
+  templatesPublished: number;
+  schemes: number;
+  schemeApplications: number;
+}
+export type PnCaseStatus = 'submitted' | 'published' | 'rejected';
+export interface PnCase {
+  id: string;
+  title: string;
+  species: string;
+  body: string;
+  submitterName: string;
+  submittedBy: string;
+  status: PnCaseStatus;
+  createdAt: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+}
+export interface PnCertificate {
+  id: string;
+  number: string | null;
+  status: 'draft' | 'issued' | 'cancelled';
+  templateId: string;
+  vetName: string | null;
+  vetInstitution: string | null;
+  vetDistrict: string | null;
+  issuedAt: string | null;
+  createdAt: string | null;
+  cancelledReason: string | null;
+  cancelledAt: string | null;
+}
+export interface PnVet {
+  uid: string;
+  fullName: string | null;
+  designation: string | null;
+  registrationNo: string | null;
+  institution: string | null;
+  district: string | null;
+  createdAt: string | null;
+  email: string | null;
+  disabled: boolean | null;
+}
+export interface PnTemplate {
+  id: string;
+  key: string;
+  name: string;
+  numberPrefix: string;
+  published: boolean;
+}
+export interface PnScheme {
+  id: string;
+  name: string;
+  tag: string;
+  description: string;
+  fileName: string | null;
+  fileUrl: string | null;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+export interface PnSchemeApplication {
+  id: string;
+  schemeId: string;
+  applicantName: string;
+  mobile: string;
+  village: string;
+  animalCount: string;
+  createdBy: string | null;
+  createdAt: string | null;
+}
+
+const PN = '/apps/pasunestam';
+export const pasunestamApi = {
+  summary: () => api.get<PnSummary>(`${PN}/summary`),
+  cases: (status: PnCaseStatus = 'submitted') => api.get<{ cases: PnCase[] }>(`${PN}/cases?status=${status}`),
+  reviewCase: (id: string, decision: 'published' | 'rejected') =>
+    api.post<{ case: PnCase }>(`${PN}/cases/${encodeURIComponent(id)}/review`, { decision }),
+  certificates: (q: { number?: string; status?: PnCertificate['status'] } = {}) =>
+    api.get<{ certificates: PnCertificate[] }>(`${PN}/certificates${toQueryString(q)}`),
+  cancelCertificate: (id: string, reason: string) =>
+    api.post<{ certificate: PnCertificate }>(`${PN}/certificates/${encodeURIComponent(id)}/cancel`, { reason }),
+  vets: (after?: string) => api.get<{ items: PnVet[]; nextCursor: string | null }>(`${PN}/vets${toQueryString({ after })}`),
+  setVetDisabled: (uid: string, disabled: boolean) =>
+    api.post<{ uid: string; disabled: boolean }>(`${PN}/vets/${encodeURIComponent(uid)}/account`, { disabled }),
+  templates: () => api.get<{ templates: PnTemplate[] }>(`${PN}/templates`),
+  setTemplatePublished: (id: string, published: boolean) =>
+    api.post<{ template: PnTemplate }>(`${PN}/templates/${encodeURIComponent(id)}/published`, { published }),
+  schemes: () => api.get<{ schemes: PnScheme[] }>(`${PN}/schemes`),
+  deleteScheme: (id: string) => api.delete<{ deleted: boolean }>(`${PN}/schemes/${encodeURIComponent(id)}`),
+  schemeApplications: () => api.get<{ applications: PnSchemeApplication[] }>(`${PN}/scheme-applications`),
+};
