@@ -414,6 +414,33 @@ body {
   font-size: 13px;
 }
 
+.login__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.login__divider::before,
+.login__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+a.btn {
+  text-align: center;
+  text-decoration: none;
+}
+
 .login__error {
   background: rgba(220, 38, 38, 0.1);
   color: var(--down);

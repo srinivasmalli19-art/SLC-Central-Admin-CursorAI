@@ -222,7 +222,29 @@ export type AuthEventType =
   | 'ADMIN_LOGOUT'
   | 'ADMIN_DISABLED'
   | 'PASSWORD_CHANGED'
-  | 'ROLE_CHANGED';
+  | 'ROLE_CHANGED'
+  | 'ADMIN_SSO_LOGIN'
+  | 'ADMIN_SSO_LOGIN_FAILED'
+  | 'ADMIN_SSO_PROVISIONED'
+  | 'ADMIN_SSO_LINKED'
+  | 'ADMIN_SSO_BACKCHANNEL_LOGOUT';
+
+/** Public sign-in options, as returned by `GET /api/v1/auth/config`. */
+export interface AuthOptions {
+  /** Whether the email + password form is accepted. */
+  passwordLoginEnabled: boolean;
+  /** Whether "Sign in with <provider>" (central SSO) is available. */
+  ssoEnabled: boolean;
+  /** Button label for the SSO provider, e.g. "SLC Account". */
+  ssoProviderName: string | null;
+}
+
+/** Response of `POST /api/v1/auth/logout`. */
+export interface LogoutResult {
+  loggedOut: true;
+  /** When set, the browser must navigate here to end the central SSO session too. */
+  ssoLogoutUrl?: string;
+}
 
 /** Minimum length for Central Admin passwords (practical, not restrictive). */
 export const PASSWORD_MIN_LENGTH = 12;

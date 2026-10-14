@@ -43,7 +43,8 @@ export async function login(
 
   // Verify against a real hash when present; otherwise perform a dummy verify to
   // keep timing similar for unknown accounts.
-  const passwordOk = admin
+  // SSO-only accounts have no local password and can never sign in here.
+  const passwordOk = admin?.passwordHash
     ? await verifyPassword(admin.passwordHash, password)
     : await verifyPassword(
         '$argon2id$v=19$m=19456,t=2,p=1$c29tZS1zYWx0LXZhbHVl$3s8b2i3o8n1Zr8m8m9q0Xh0Zr8m8m9q0Xh0Zr8m8m9q',
@@ -56,7 +57,15 @@ export async function login(
       ipAddress: ctx.ipAddress,
       userAgent: ctx.userAgent,
       adminUserId: admin?.id,
-      metadata: { reason: !admin ? 'unknown_user' : admin.status === 'DISABLED' ? 'disabled' : 'bad_password' },
+      metadata: {
+        reason: !admin
+          ? 'unknown_user'
+          : admin.status === 'DISABLED'
+            ? 'disabled'
+            : !admin.passwordHash
+              ? 'sso_only_account'
+              : 'bad_password',
+      },
     });
     throw INVALID_CREDENTIALS;
   }
@@ -118,6 +127,14 @@ export async function changePassword(
   const admin = await prisma.adminUser.findUnique({ where: { id: adminUserId } });
   if (!admin) {
     throw new AppError(404, 'NOT_FOUND', 'Administrator not found.');
+  }
+
+  if (!admin.passwordHash) {
+    throw new AppError(
+      409,
+      'SSO_ACCOUNT',
+      'This account signs in through central SSO. Change the password in the SLC account page.',
+    );
   }
 
   const ok = await verifyPassword(admin.passwordHash, currentPassword);

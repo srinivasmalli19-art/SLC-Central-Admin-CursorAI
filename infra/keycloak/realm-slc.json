@@ -1,0 +1,450 @@
+{
+  "realm": "slc",
+  "displayName": "SLC Admin Sign-in",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "editUsernameAllowed": false,
+
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+
+  "passwordPolicy": "length(12) and notUsername and notEmail and passwordHistory(3)",
+
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+
+  "eventsEnabled": true,
+  "eventsExpiration": 7776000,
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": true,
+      "priority": 10,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PROFILE",
+      "name": "Update Profile",
+      "providerId": "UPDATE_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 40,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
+    }
+  ],
+
+  "roles": {
+    "client": {
+      "central-admin": [
+        { "name": "SUPER_ADMIN", "description": "Full control over the SLC Central Admin platform." },
+        { "name": "APP_ADMIN", "description": "Manages registered applications and their integrations." },
+        { "name": "CONTENT_ADMIN", "description": "Manages content and outbound notifications." },
+        { "name": "SUPPORT_ADMIN", "description": "Handles user support operations and monitoring." },
+        { "name": "REPORT_VIEWER", "description": "Read-only access to reports." }
+      ],
+      "pasumithra-admin": [
+        { "name": "super_admin", "description": "Full control of the Pasumithra admin portal." },
+        { "name": "moderator", "description": "Moderates Pasumithra listings and users." },
+        { "name": "viewer", "description": "Read-only access to the Pasumithra admin portal." }
+      ],
+      "jeevamitra-admin": [
+        { "name": "super_admin", "description": "Full control of JeevaMitra admin functions." },
+        { "name": "admin", "description": "Day-to-day JeevaMitra administration." },
+        { "name": "viewer", "description": "Read-only JeevaMitra admin access." }
+      ],
+      "slcvet-admin": [
+        { "name": "super_admin", "description": "Full control of SLC Vet admin functions." },
+        { "name": "admin", "description": "Day-to-day SLC Vet administration." },
+        { "name": "viewer", "description": "Read-only SLC Vet admin access." }
+      ],
+      "stock-admin": [
+        { "name": "super_admin", "description": "Full control of Stock Management admin functions." },
+        { "name": "admin", "description": "Day-to-day Stock Management administration." },
+        { "name": "viewer", "description": "Read-only Stock Management admin access." }
+      ],
+      "nearsip-admin": [
+        { "name": "super_admin", "description": "Full control of NearSip admin functions." },
+        { "name": "admin", "description": "Day-to-day NearSip administration." },
+        { "name": "viewer", "description": "Read-only NearSip admin access." }
+      ]
+    }
+  },
+
+  "groups": [
+    {
+      "name": "slc-super-admins",
+      "clientRoles": {
+        "central-admin": ["SUPER_ADMIN"],
+        "pasumithra-admin": ["super_admin"],
+        "jeevamitra-admin": ["super_admin"],
+        "slcvet-admin": ["super_admin"],
+        "stock-admin": ["super_admin"],
+        "nearsip-admin": ["super_admin"]
+      }
+    },
+    {
+      "name": "slc-support",
+      "clientRoles": {
+        "central-admin": ["SUPPORT_ADMIN"],
+        "pasumithra-admin": ["viewer"],
+        "jeevamitra-admin": ["viewer"],
+        "slcvet-admin": ["viewer"],
+        "stock-admin": ["viewer"],
+        "nearsip-admin": ["viewer"]
+      }
+    }
+  ],
+
+  "clients": [
+    {
+      "clientId": "central-admin",
+      "name": "SLC Central Admin",
+      "description": "Central Admin portal. Confidential client: the API (backend-for-frontend) performs the code exchange.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-only-central-admin-secret-change-me",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": ["http://localhost:5173/api/v1/auth/oidc/callback"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/login",
+        "backchannel.logout.url": "http://host.docker.internal:4000/api/v1/auth/oidc/backchannel-logout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "central-admin roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "central-admin",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "central-admin audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "central-admin",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "pasumithra-admin",
+      "name": "Pasumithra admin portal",
+      "description": "Public SPA client (Authorization Code + PKCE). Wired up in rollout step 4.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5174/*"],
+      "webOrigins": ["http://localhost:5174"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5174/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "pasumithra-admin roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "pasumithra-admin",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "pasumithra-admin audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "pasumithra-admin",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "jeevamitra-admin",
+      "name": "JeevaMitra admin (Flutter)",
+      "description": "Public native client (Authorization Code + PKCE via flutter_appauth). Redirect scheme is a placeholder until the app's package id is confirmed. Wired up in rollout step 5.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["com.slcvet.jeevamitra.admin:/oauthredirect"],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "com.slcvet.jeevamitra.admin:/logout"
+      },
+      "protocolMappers": [
+        {
+          "name": "jeevamitra-admin roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "jeevamitra-admin",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "jeevamitra-admin audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "jeevamitra-admin",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "slcvet-admin",
+      "name": "SLC Vet admin",
+      "description": "Public SPA client; the FastAPI backend validates access tokens (aud=slcvet-admin). Wired up in rollout step 3.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "slcvet-admin roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "slcvet-admin",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "slcvet-admin audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "slcvet-admin",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "stock-admin",
+      "name": "Stock Management admin",
+      "description": "Public SPA client; the Express backend validates access tokens (aud=stock-admin). Wired up in rollout step 3.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5175/*"],
+      "webOrigins": ["http://localhost:5175"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5175/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "stock-admin roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "stock-admin",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "stock-admin audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "stock-admin",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "nearsip-admin",
+      "name": "NearSip admin (via Supabase Auth)",
+      "description": "Confidential client used by Supabase Auth's Keycloak provider. Redirect URI is a placeholder until the Supabase project URL is confirmed. Wired up in rollout step 5.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-only-nearsip-admin-secret-change-me",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["https://YOUR-NEARSIP-PROJECT.supabase.co/auth/v1/callback"],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "nearsip-admin roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "nearsip-admin",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+
+  "users": [
+    {
+      "username": "superadmin@slc.local",
+      "email": "superadmin@slc.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "Super Admin",
+      "credentials": [
+        { "type": "password", "value": "DevOnly-ChangeMe-2026", "temporary": true }
+      ],
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"],
+      "groups": ["/slc-super-admins"]
+    },
+    {
+      "username": "support@slc.local",
+      "email": "support@slc.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "Support",
+      "credentials": [
+        { "type": "password", "value": "DevOnly-ChangeMe-2026", "temporary": true }
+      ],
+      "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"],
+      "groups": ["/slc-support"]
+    }
+  ]
+}

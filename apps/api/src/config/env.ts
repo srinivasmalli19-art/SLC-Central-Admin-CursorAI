@@ -58,6 +58,26 @@ const envSchema = z.object({
   // by default so no outbound host is permitted until explicitly configured.
   INTEGRATION_EGRESS_ALLOWLIST: z.string().default(''),
 
+  // ---- Central SSO (OIDC, e.g. Keycloak) ---------------------------------
+  /** Issuer URL of the central identity provider, e.g. https://id.slcvet.com/realms/slc. */
+  OIDC_ISSUER_URL: z.string().url().optional(),
+  OIDC_CLIENT_ID: z.string().min(1).optional(),
+  OIDC_CLIENT_SECRET: z.string().min(1).optional(),
+  /** Defaults to `${WEB_BASE_URL}/api/v1/auth/oidc/callback` (the web origin proxies /api). */
+  OIDC_REDIRECT_URI: z.string().url().optional(),
+  /** Where the IdP sends the browser after sign-out. Defaults to `${WEB_BASE_URL}/login`. */
+  OIDC_POST_LOGOUT_REDIRECT_URI: z.string().url().optional(),
+  /** Claim holding this app's role keys (dot path allowed, e.g. resource_access.central-admin.roles). */
+  OIDC_ROLES_CLAIM: z.string().min(1).default('roles'),
+  OIDC_SCOPES: z.string().min(1).default('openid email profile'),
+  /** Label for the login button. */
+  OIDC_PROVIDER_NAME: z.string().min(1).default('SLC Account'),
+  /**
+   * Whether the legacy email + password form stays available. Defaults to
+   * true when SSO is not configured and false when it is.
+   */
+  PASSWORD_LOGIN_ENABLED: booleanFromString.optional(),
+
   // ---- Bootstrap (dev-only) super admin ----------------------------------
   BOOTSTRAP_ADMIN_EMAIL: z.string().email().optional(),
   BOOTSTRAP_ADMIN_PASSWORD: z.string().optional(),
@@ -71,6 +91,17 @@ export interface CookieConfig {
   secure: boolean;
   sameSite: 'strict' | 'lax' | 'none';
   domain: string | undefined;
+}
+
+export interface OidcConfig {
+  issuerUrl: string;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  postLogoutRedirectUri: string;
+  rolesClaim: string;
+  scopes: string;
+  providerName: string;
 }
 
 export interface AppConfig {
@@ -89,6 +120,10 @@ export interface AppConfig {
   cookie: CookieConfig;
   login: { rateLimitMax: number; rateLimitWindowMs: number };
   bootstrap: { email: string | undefined; password: string | undefined };
+  /** Central SSO settings; null when SSO is not configured. */
+  oidc: OidcConfig | null;
+  /** Whether `POST /auth/login` (email + password) is accepted. */
+  passwordLoginEnabled: boolean;
   integration: { egressAllowlist: string[] };
 }
 
@@ -129,6 +164,21 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     errors.push('COOKIE_SECURE: must be true when COOKIE_SAMESITE=none');
   }
 
+  // Central SSO: all-or-nothing. Partial settings are a misconfiguration.
+  const oidcValues = [env.OIDC_ISSUER_URL, env.OIDC_CLIENT_ID, env.OIDC_CLIENT_SECRET];
+  const oidcSetCount = oidcValues.filter(Boolean).length;
+  if (oidcSetCount > 0 && oidcSetCount < oidcValues.length) {
+    errors.push('OIDC_ISSUER_URL, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set together');
+  }
+  const oidcEnabled = oidcSetCount === oidcValues.length;
+  if (isDeployed && oidcEnabled && env.OIDC_ISSUER_URL!.startsWith('http:')) {
+    errors.push('OIDC_ISSUER_URL: must use https in production/staging');
+  }
+  const passwordLoginEnabled = env.PASSWORD_LOGIN_ENABLED ?? !oidcEnabled;
+  if (!oidcEnabled && !passwordLoginEnabled) {
+    errors.push('PASSWORD_LOGIN_ENABLED: cannot be false unless OIDC is configured (no way to sign in)');
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `Invalid environment configuration:\n${errors.map((e) => `  - ${e}`).join('\n')}`,
@@ -162,6 +212,21 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       email: env.BOOTSTRAP_ADMIN_EMAIL,
       password: env.BOOTSTRAP_ADMIN_PASSWORD,
     },
+    oidc: oidcEnabled
+      ? {
+          issuerUrl: env.OIDC_ISSUER_URL!,
+          clientId: env.OIDC_CLIENT_ID!,
+          clientSecret: env.OIDC_CLIENT_SECRET!,
+          redirectUri:
+            env.OIDC_REDIRECT_URI ?? `${env.WEB_BASE_URL.replace(/\/$/, '')}/api/v1/auth/oidc/callback`,
+          postLogoutRedirectUri:
+            env.OIDC_POST_LOGOUT_REDIRECT_URI ?? `${env.WEB_BASE_URL.replace(/\/$/, '')}/login`,
+          rolesClaim: env.OIDC_ROLES_CLAIM,
+          scopes: env.OIDC_SCOPES,
+          providerName: env.OIDC_PROVIDER_NAME,
+        }
+      : null,
+    passwordLoginEnabled,
     integration: {
       egressAllowlist: env.INTEGRATION_EGRESS_ALLOWLIST.split(',')
         .map((h) => h.trim())

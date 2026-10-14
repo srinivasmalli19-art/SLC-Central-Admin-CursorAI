@@ -7,6 +7,14 @@ export interface SessionContext {
   userAgent?: string;
 }
 
+/** Extra data stored on sessions created through central SSO. */
+export interface SsoSessionData {
+  /** IdP session id (`sid` claim), used by back-channel logout. */
+  oidcSid?: string;
+  /** Raw ID token, kept only to send as `id_token_hint` at logout. */
+  idTokenHint?: string;
+}
+
 export interface IssuedSession {
   /** Raw opaque token to place in the client cookie (never persisted). */
   token: string;
@@ -17,6 +25,7 @@ export interface IssuedSession {
 export async function createSession(
   adminUserId: string,
   ctx: SessionContext = {},
+  sso: SsoSessionData = {},
 ): Promise<IssuedSession> {
   const prisma = requirePrisma();
   const token = generateOpaqueToken();
@@ -29,6 +38,8 @@ export async function createSession(
       expiresAt,
       ipAddress: ctx.ipAddress,
       userAgent: ctx.userAgent,
+      oidcSid: sso.oidcSid,
+      idTokenHint: sso.idTokenHint,
     },
   });
 
@@ -64,6 +75,23 @@ export async function resolveSession(token: string): Promise<ActiveSession | nul
     .catch(() => undefined);
 
   return { id: session.id, adminUserId: session.adminUserId };
+}
+
+/** The ID token hint stored for an SSO session, if any (used at logout). */
+export async function getIdTokenHint(token: string): Promise<string | null> {
+  const prisma = requirePrisma();
+  const session = await prisma.adminSession.findUnique({
+    where: { tokenHash: hashToken(token) },
+    select: { idTokenHint: true },
+  });
+  return session?.idTokenHint ?? null;
+}
+
+/** Revoke every session tied to one IdP session (back-channel logout). */
+export async function revokeSessionsByOidcSid(oidcSid: string): Promise<number> {
+  const prisma = requirePrisma();
+  const result = await prisma.adminSession.deleteMany({ where: { oidcSid } });
+  return result.count;
 }
 
 /** Revoke a single session by its raw cookie token. */

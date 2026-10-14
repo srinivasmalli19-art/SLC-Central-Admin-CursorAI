@@ -1,4 +1,6 @@
 import type {
+  AuthOptions,
+  LogoutResult,
   Application,
   ApplicationListQuery,
   ApplicationStats,
@@ -101,8 +103,12 @@ export function fetchHealth(): Promise<HealthResponse> {
 export const authApi = {
   login: (email: string, password: string) =>
     api.post<{ user: CurrentUser; csrfToken: string }>('/auth/login', { email, password }),
-  logout: () => api.post<{ loggedOut: boolean }>('/auth/logout'),
+  logout: () => api.post<LogoutResult>('/auth/logout'),
   me: () => api.get<{ user: CurrentUser | null }>('/auth/me'),
+  options: () => api.get<AuthOptions>('/auth/config'),
+  /** Full-page navigation target that starts central SSO sign-in. */
+  ssoLoginUrl: (returnTo?: string) =>
+    `${API_PREFIX}/auth/oidc/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`,
 };
 
 function toQueryString(query: Record<string, unknown>): string {

@@ -48,7 +48,10 @@ enum AdminUserStatus {
 model AdminUser {
   id           String          @id @default(uuid())
   email        String          @unique
-  passwordHash String
+  /// Null for SSO-only accounts (no local password).
+  passwordHash String?
+  /// Subject (`sub`) of the linked account in the central identity provider.
+  oidcSubject  String?         @unique
   name         String?
   status       AdminUserStatus @default(ACTIVE)
   /// MFA extension point (Phase 2 architecture only — TOTP not implemented).
@@ -208,11 +211,16 @@ model AdminSession {
   lastUsedAt  DateTime @default(now())
   userAgent   String?
   ipAddress   String?
+  /// IdP session id (`sid`) for SSO sessions; used by back-channel logout.
+  oidcSid     String?
+  /// ID token kept only as `id_token_hint` for RP-initiated logout.
+  idTokenHint String?
 
   adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
 
   @@index([adminUserId])
   @@index([expiresAt])
+  @@index([oidcSid])
   @@map("admin_session")
 }
 

@@ -53,11 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    let ssoLogoutUrl: string | undefined;
     try {
-      await authApi.logout();
+      ({ ssoLogoutUrl } = await authApi.logout());
     } finally {
       setUser(null);
       setStatus('unauthenticated');
+    }
+    if (ssoLogoutUrl) {
+      // End the central SSO session too; the IdP sends the browser back to /login.
+      window.location.assign(ssoLogoutUrl);
     }
   }, []);
 
