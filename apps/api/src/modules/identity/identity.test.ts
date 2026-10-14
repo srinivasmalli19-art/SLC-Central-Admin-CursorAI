@@ -117,7 +117,7 @@ describe('central identity management', () => {
       .send({ email: 'New.Person@SLC.test', firstName: 'New', appRoles: { 'pasumithra-admin': ['viewer'], 'stock-admin': ['manager'] } });
 
     expect(res.status).toBe(201);
-    expect(res.body.data.invitationEmailSent).toBe(true);
+    expect(res.body.data).toMatchObject({ invitationEmailSent: true, invitationEmailEnabled: true });
     expect(res.body.data.user).toMatchObject({
       email: 'new.person@slc.test',
       pendingActions: ['UPDATE_PASSWORD', 'CONFIGURE_TOTP', 'VERIFY_EMAIL'],
@@ -136,7 +136,7 @@ describe('central identity management', () => {
       .set('X-CSRF-Token', CSRF)
       .send({ email: 'nosmtp@slc.test', appRoles: { 'stock-admin': ['viewer'] } });
     expect(res.status).toBe(201);
-    expect(res.body.data.invitationEmailSent).toBe(false);
+    expect(res.body.data).toMatchObject({ invitationEmailSent: false, invitationEmailEnabled: true });
   });
 
   it('rejects unknown apps and roles before creating anything', async () => {

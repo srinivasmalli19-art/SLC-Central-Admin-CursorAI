@@ -171,7 +171,9 @@ export function AdminAccess() {
         setNotice(
           result.invitationEmailSent
             ? `Invited ${result.user.email}. They will get an email to set a password and an authenticator app.`
-            : `Created ${result.user.email}, but the invitation email could not be sent. Check the identity provider's email settings, then use "Resend set-up email".`,
+            : result.invitationEmailEnabled === false
+              ? `Created ${result.user.email}. Invitation emails are switched off, so set a temporary password for them in the Keycloak console; they will choose their own password and authenticator app at first sign-in.`
+              : `Created ${result.user.email}, but the invitation email could not be sent. Check the identity provider's email settings, then use "Resend set-up email".`,
         );
       } else {
         // Send every app so removed roles are removed too.

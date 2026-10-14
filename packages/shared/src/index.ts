@@ -603,6 +603,8 @@ export interface InviteIdentityUserResult {
   user: IdentityUser;
   /** Whether Keycloak emailed the set-password + MFA link. */
   invitationEmailSent: boolean;
+  /** False when invitation emails are switched off (KEYCLOAK_SEND_INVITE_EMAIL=false). */
+  invitationEmailEnabled: boolean;
 }
 
 /** One row of the central audit log. */

@@ -278,7 +278,7 @@ export async function inviteUser(
     userAgent: actor.userAgent,
   });
 
-  return { user: await getUser(userId), invitationEmailSent };
+  return { user: await getUser(userId), invitationEmailSent, invitationEmailEnabled: cfg.sendInviteEmail };
 }
 
 export async function setUserAppRoles(userId: string, appRoles: AppRoleMap, actor: ActorContext): Promise<IdentityUser> {
