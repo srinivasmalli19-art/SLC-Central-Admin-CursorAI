@@ -62,7 +62,6 @@ export class KeycloakAdminError extends AppError {
   }
 }
 
-const REQUEST_TIMEOUT_MS = 10_000;
 
 export function requireKeycloakAdminConfig(): KeycloakAdminConfig {
   if (!config.keycloakAdmin) {
@@ -86,7 +85,9 @@ export function resetKeycloakAdminCache(): void {
 
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  // Long enough for a provider that scales to zero to wake (IDP_TIMEOUT_SECONDS).
+  const timeoutMs = (config.keycloakAdmin?.timeoutSeconds ?? 30) * 1000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (error) {

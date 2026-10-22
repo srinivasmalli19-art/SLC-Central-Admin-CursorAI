@@ -78,6 +78,11 @@ const envSchema = z.object({
   /** Label for the login button. */
   OIDC_PROVIDER_NAME: z.string().min(1).default('SLC Account'),
   /**
+   * How long to wait for the identity provider, in seconds. Raise it when the
+   * provider scales to zero and needs time to wake (e.g. Cloud Run: 90).
+   */
+  IDP_TIMEOUT_SECONDS: z.coerce.number().int().positive().max(300).default(30),
+  /**
    * Whether the legacy email + password form stays available. Defaults to
    * true when SSO is not configured and false when it is.
    */
@@ -154,6 +159,8 @@ export interface OidcConfig {
   rolesClaim: string;
   scopes: string;
   providerName: string;
+  /** Seconds to wait for the identity provider. */
+  timeoutSeconds: number;
 }
 
 export interface KeycloakAdminConfig {
@@ -163,6 +170,8 @@ export interface KeycloakAdminConfig {
   clientSecret: string;
   managedApps: { clientId: string; name: string }[];
   sendInviteEmail: boolean;
+  /** Seconds to wait for Keycloak. */
+  timeoutSeconds: number;
 }
 
 export interface FirebaseBridgeApp {
@@ -403,6 +412,7 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
           rolesClaim: env.OIDC_ROLES_CLAIM,
           scopes: env.OIDC_SCOPES,
           providerName: env.OIDC_PROVIDER_NAME,
+          timeoutSeconds: env.IDP_TIMEOUT_SECONDS,
         }
       : null,
     keycloakAdmin:
@@ -414,6 +424,7 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
             clientSecret: env.KEYCLOAK_ADMIN_CLIENT_SECRET!,
             managedApps,
             sendInviteEmail: env.KEYCLOAK_SEND_INVITE_EMAIL,
+            timeoutSeconds: env.IDP_TIMEOUT_SECONDS,
           }
         : null,
     firebaseBridge,

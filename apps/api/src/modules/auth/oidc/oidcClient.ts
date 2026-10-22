@@ -30,8 +30,13 @@ export function getOidcConfiguration(): Promise<oidc.Configuration> {
         settings.clientId,
         settings.clientSecret,
         undefined,
-        // Plain http is only ever permitted outside production/staging (validated in env.ts).
-        issuer.protocol === 'http:' ? { execute: [oidc.allowInsecureRequests] } : undefined,
+        {
+          // Also applies to later token requests; long enough for a provider
+          // that scales to zero to wake up.
+          timeout: settings.timeoutSeconds,
+          // Plain http is only ever permitted outside production/staging (validated in env.ts).
+          ...(issuer.protocol === 'http:' ? { execute: [oidc.allowInsecureRequests] } : {}),
+        },
       )
       .catch((error: unknown) => {
         configurationPromise = null;
@@ -41,10 +46,29 @@ export function getOidcConfiguration(): Promise<oidc.Configuration> {
   return configurationPromise;
 }
 
+let lastWake = 0;
+const WAKE_INTERVAL_MS = 60_000;
+
+/**
+ * Nudge the identity provider awake without waiting for it, at most once a
+ * minute. Called when the login page loads, so a provider that scales to zero
+ * (Cloud Run) is ready by the time the person presses "Sign in".
+ */
+export function wakeIdentityProvider(now = Date.now()): boolean {
+  if (!config.oidc || now - lastWake < WAKE_INTERVAL_MS) return false;
+  lastWake = now;
+  const url = `${config.oidc.issuerUrl.replace(/\/$/, '')}/.well-known/openid-configuration`;
+  void fetch(url, { signal: AbortSignal.timeout(config.oidc.timeoutSeconds * 1000) }).catch(() => {
+    // Best effort only; the sign-in itself waits and reports problems.
+  });
+  return true;
+}
+
 /** Test hook: forget cached discovery/JWKS state. */
 export function resetOidcClientCache(): void {
   configurationPromise = null;
   jwks = null;
+  lastWake = 0;
 }
 
 export interface AuthorizationRequest {

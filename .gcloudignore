@@ -1,0 +1,10 @@
+# Files Google Cloud Build does not need (keeps uploads small and secrets out).
+.git
+.gitignore
+**/node_modules
+**/dist
+.env
+.env.*
+!.env.example
+.demo
+coverage
