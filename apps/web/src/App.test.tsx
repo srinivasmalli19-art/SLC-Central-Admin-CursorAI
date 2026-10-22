@@ -39,6 +39,7 @@ const superAdmin: CurrentUser = {
   name: 'Super Admin',
   status: 'ACTIVE',
   mfaEnabled: false,
+  appRoles: {},
   roles: ['SUPER_ADMIN'],
   permissions: ['applications.view', 'system.manage'],
 };
@@ -60,7 +61,7 @@ describe('App auth shell', () => {
     mockFetch(null);
     renderAt('/');
     expect(await screen.findByRole('heading', { name: 'Central Admin' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Email')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Email')).toBeInTheDocument();
   });
 
   it('renders the authenticated dashboard for a signed-in admin', async () => {

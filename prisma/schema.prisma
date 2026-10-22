@@ -48,11 +48,21 @@ enum AdminUserStatus {
 model AdminUser {
   id           String          @id @default(uuid())
   email        String          @unique
-  passwordHash String
+  /// Null for SSO-only accounts (no local password).
+  passwordHash String?
+  /// Subject (`sub`) of the linked account in the central identity provider.
+  oidcSubject  String?         @unique
+  /// Roles per SLC app (Keycloak client id → role names), synced at each SSO sign-in.
+  appRoles     Json            @default("{}")
   name         String?
   status       AdminUserStatus @default(ACTIVE)
   /// MFA extension point (Phase 2 architecture only — TOTP not implemented).
   mfaEnabled   Boolean         @default(false)
+  /// Authenticator (TOTP) secret for break-glass password sign-in, encrypted
+  /// with MFA_ENCRYPTION_KEY. SSO admins use Keycloak's MFA instead.
+  mfaSecret       String?
+  /// Last accepted TOTP time step, so a code cannot be used twice.
+  mfaLastUsedStep Int?
   lastLoginAt  DateTime?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
@@ -208,11 +218,16 @@ model AdminSession {
   lastUsedAt  DateTime @default(now())
   userAgent   String?
   ipAddress   String?
+  /// IdP session id (`sid`) for SSO sessions; used by back-channel logout.
+  oidcSid     String?
+  /// ID token kept only as `id_token_hint` for RP-initiated logout.
+  idTokenHint String?
 
   adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
 
   @@index([adminUserId])
   @@index([expiresAt])
+  @@index([oidcSid])
   @@map("admin_session")
 }
 
@@ -332,4 +347,32 @@ model IntegrationEvent {
 
   @@index([applicationIntegrationId])
   @@map("integration_event")
+}
+
+// ============================================================================
+// Central audit log (SSO step 2)
+// ----------------------------------------------------------------------------
+// Every privileged action and authentication event. Secret-free by contract:
+// metadata never holds passwords, tokens or credential values.
+// ============================================================================
+
+/// One audited action.
+model AuditLog {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  /// e.g. ADMIN_SSO_LOGIN, IDENTITY_USER_INVITED, IDENTITY_ROLES_CHANGED.
+  action     String
+  actorId    String?
+  /// Snapshot of the actor's email; survives account deletion.
+  actorEmail String?
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
+  @@map("audit_log")
 }

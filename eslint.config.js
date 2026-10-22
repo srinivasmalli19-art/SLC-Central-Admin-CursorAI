@@ -44,6 +44,15 @@ export default tseslint.config(
       globals: { ...globals.browser },
     },
   },
+  // Node scripts under infra/ (e.g. the production realm generator)
+  {
+    files: ['infra/**/*.{js,mjs}'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+  },
   // Test files
   {
     files: ['**/*.{test,spec}.{ts,tsx}', 'tests/**/*.{ts,tsx}'],

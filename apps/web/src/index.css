@@ -414,6 +414,33 @@ body {
   font-size: 13px;
 }
 
+.login__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login__divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.login__divider::before,
+.login__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+a.btn {
+  text-align: center;
+  text-decoration: none;
+}
+
 .login__error {
   background: rgba(220, 38, 38, 0.1);
   color: var(--down);
@@ -575,6 +602,188 @@ code {
   margin-top: 6px;
 }
 
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 0 0 20px;
+}
+
+.kpi {
+  margin: 0;
+  padding: 14px 16px;
+}
+
+.kpi__label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kpi__value {
+  margin: 6px 0 0;
+  font-size: 26px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi--warn {
+  border-left: 3px solid var(--warn);
+}
+
+.sidebar__section {
+  margin: 18px 12px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(203, 213, 225, 0.6);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.tabs__tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tabs__tab--active {
+  color: var(--text);
+  border-bottom-color: var(--slc-primary);
+  font-weight: 600;
+}
+
+/* ---- Admin access + audit log ------------------------------------------------ */
+.page__lead {
+  margin: -4px 0 16px;
+  max-width: 72ch;
+}
+
+.notice {
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.access-panel {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.access-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.access-editor__app {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px 12px;
+  margin: 0;
+  min-width: 0;
+}
+
+.access-editor__name {
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.access-editor__roles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.access-editor__role {
+  display: flex;
+  font-size: 14px;
+}
+
+.badge-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.role-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.role-list li {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 6px;
+}
+
+.role-list__app {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.role-list__roles {
+  color: var(--text-muted);
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.row-actions .btn {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.btn--danger {
+  background: transparent;
+  color: var(--down);
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
+.btn--danger:hover {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: var(--down);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.table__detail {
+  font-size: 13px;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
 /* ---- Responsive ------------------------------------------------------------ */
 @media (max-width: 860px) {
   .sidebar {
@@ -601,4 +810,10 @@ code {
     border: 0;
     background: rgba(15, 23, 42, 0.4);
   }
+}
+
+.case-body {
+  white-space: pre-wrap;
+  max-width: 60ch;
+  margin: 8px 0 0;
 }

@@ -47,6 +47,8 @@ curl http://localhost:4000/api/v1/health
 ## Documentation
 
 - Phase 1 foundation: [`docs/SLC-PHASE-1-FOUNDATION.md`](docs/SLC-PHASE-1-FOUNDATION.md)
+- Central SSO with Keycloak (step 1): [`docs/SLC-CENTRAL-SSO.md`](docs/SLC-CENTRAL-SSO.md) and
+  [`infra/keycloak/README.md`](infra/keycloak/README.md)
 
 Phase 0 ecosystem discovery artifacts (inventory, architecture notes,
 integration matrix, open questions) live under `docs/` as well once the Phase 0

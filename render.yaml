@@ -1,0 +1,136 @@
+# Render Blueprint: SLC central login (Keycloak) + SLC Central Admin, each with
+# its own PostgreSQL, in Singapore.
+#
+# In Render: New > Blueprint > pick this repository > Apply. Render asks for
+# one value only: FIRST_SUPER_ADMIN_EMAIL (your own email, lower case). The
+# step-by-step guide is infra/keycloak/production/README.md.
+#
+# Addresses: the services start on Render's own addresses
+#   https://slcvet-id.onrender.com      (central login)
+#   https://slcvet-admin.onrender.com   (Central Admin)
+# If Render gives a service a different address (it adds a few letters when a
+# name is taken), update CENTRAL_ADMIN_URL / OIDC_ISSUER_URL below to match.
+# Custom domains (id.slcvet.com, admin.slcvet.com) can be added later.
+
+databases:
+  - name: slc-keycloak-db
+    databaseName: keycloak
+    user: keycloak
+    region: singapore
+    plan: 0.1c-256mb
+    postgresMajorVersion: "16"
+    ipAllowList: [] # reachable only from Render services in the same region
+
+  - name: slc-central-admin-db
+    databaseName: slc_central_admin
+    user: slc_admin
+    region: singapore
+    plan: 0.1c-256mb
+    postgresMajorVersion: "16"
+    ipAllowList: []
+
+services:
+  # ---------------------------------------------------------------- Keycloak
+  - type: web
+    name: slcvet-id
+    runtime: docker
+    region: singapore
+    plan: 1c-2g # 2 GB: Keycloak needs about 1.25 GB
+    dockerContext: ./infra/keycloak/production
+    dockerfilePath: ./infra/keycloak/production/Dockerfile
+    healthCheckPath: /realms/slc/.well-known/openid-configuration
+    envVars:
+      - key: PORT
+        value: "8080"
+      # Public address: taken from Render at start-up (start.sh). Set
+      # KC_HOSTNAME=https://id.slcvet.com here once that domain is added.
+      # Database (Render fills these in from slc-keycloak-db).
+      - key: KC_DB_URL_HOST
+        fromDatabase: { name: slc-keycloak-db, property: host }
+      - key: KC_DB_URL_PORT
+        fromDatabase: { name: slc-keycloak-db, property: port }
+      - key: KC_DB_URL_DATABASE
+        fromDatabase: { name: slc-keycloak-db, property: database }
+      - key: KC_DB_USERNAME
+        fromDatabase: { name: slc-keycloak-db, property: user }
+      - key: KC_DB_PASSWORD
+        fromDatabase: { name: slc-keycloak-db, property: password }
+      # Keycloak console login (https://slcvet-id.onrender.com/admin). Both
+      # values are on this service's Environment page in Render.
+      - key: KC_BOOTSTRAP_ADMIN_USERNAME
+        value: slc-console-admin
+      - key: KC_BOOTSTRAP_ADMIN_PASSWORD
+        generateValue: true
+      # The first Super Admin of Central Admin (imported once, at first start).
+      # They must choose their own password and authenticator at first sign-in.
+      - key: FIRST_SUPER_ADMIN_EMAIL
+        sync: false
+      - key: FIRST_SUPER_ADMIN_TEMP_PASSWORD
+        generateValue: true
+      # Client secrets, generated once; Central Admin reads them from here.
+      - key: KC_SECRET_CENTRAL_ADMIN
+        generateValue: true
+      - key: KC_SECRET_CENTRAL_ADMIN_API
+        generateValue: true
+      - key: KC_SECRET_NEARSIP
+        generateValue: true
+      # Where each app lives (used in the realm's redirect and logout URLs at
+      # first start; later changes are made in the Keycloak console).
+      - key: CENTRAL_ADMIN_URL
+        value: https://slcvet-admin.onrender.com
+      - key: CENTRAL_ADMIN_API_URL
+        value: https://slcvet-admin.onrender.com
+      - key: STOCK_URL
+        value: https://www.logitask.in
+      - key: STOCK_API_URL
+        value: https://fieldops-backend.onrender.com
+      - key: PASUNESTAM_URL
+        value: https://pasunestam.com
+      - key: PASUMITHRA_ADMIN_URL
+        value: https://pasumithra-admin.slcvet.com
+      - key: SLCVET_URL
+        value: https://slcvet.com
+
+  # ----------------------------------------------------------- Central Admin
+  # One service serves both the API and the web app, on one address.
+  - type: web
+    name: slcvet-admin
+    runtime: node
+    region: singapore
+    plan: 0.5c-512mb # 512 MB
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
+    preDeployCommand: npx prisma migrate deploy && npm run db:seed
+    startCommand: node apps/api/dist/index.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: WEB_DIST_DIR
+        value: apps/web/dist
+      - key: DATABASE_URL
+        fromDatabase: { name: slc-central-admin-db, property: connectionString }
+      - key: COOKIE_SECURE
+        value: "true"
+      # Sign-in through the central login.
+      - key: OIDC_ISSUER_URL
+        value: https://slcvet-id.onrender.com/realms/slc
+      - key: OIDC_CLIENT_ID
+        value: central-admin
+      - key: OIDC_CLIENT_SECRET
+        fromService: { type: web, name: slcvet-id, envVarKey: KC_SECRET_CENTRAL_ADMIN }
+      - key: KEYCLOAK_ADMIN_CLIENT_ID
+        value: central-admin-api
+      - key: KEYCLOAK_ADMIN_CLIENT_SECRET
+        fromService: { type: web, name: slcvet-id, envVarKey: KC_SECRET_CENTRAL_ADMIN_API }
+      # No email service yet: new admins get a temporary password set in the
+      # Keycloak console. Switch to true once SMTP is set up in Keycloak.
+      - key: KEYCLOAK_SEND_INVITE_EMAIL
+        value: "false"
+      # Backup (break-glass) password sign-in: off until the backup admins are
+      # chosen and enrolled (see docs/SLC-CENTRAL-SSO.md).
+      - key: PASSWORD_LOGIN_ENABLED
+        value: "false"
+      - key: MFA_ENCRYPTION_KEY
+        generateValue: true

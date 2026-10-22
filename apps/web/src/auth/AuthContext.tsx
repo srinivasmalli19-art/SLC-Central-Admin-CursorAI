@@ -9,10 +9,12 @@ type AuthStatus = 'initializing' | 'authenticated' | 'unauthenticated';
 interface AuthContextValue {
   status: AuthStatus;
   user: CurrentUser | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, otp?: string) => Promise<void>;
   logout: () => Promise<void>;
   /** UX-only permission check. The backend remains authoritative. */
   can: (permission: Permission) => boolean;
+  /** UX-only: whether the admin holds any of `roles` in an SLC app. */
+  hasAppRole: (clientId: string, roles: readonly string[]) => boolean;
   refresh: () => Promise<void>;
 }
 
@@ -46,18 +48,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { user: current } = await authApi.login(email, password);
+  const login = useCallback(async (email: string, password: string, otp?: string) => {
+    const { user: current } = await authApi.login(email, password, otp);
     setUser(current);
     setStatus('authenticated');
   }, []);
 
   const logout = useCallback(async () => {
+    let ssoLogoutUrl: string | undefined;
     try {
-      await authApi.logout();
+      ({ ssoLogoutUrl } = await authApi.logout());
     } finally {
       setUser(null);
       setStatus('unauthenticated');
+    }
+    if (ssoLogoutUrl) {
+      // End the central SSO session too; the IdP sends the browser back to /login.
+      window.location.assign(ssoLogoutUrl);
     }
   }, []);
 
@@ -66,9 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const hasAppRole = useCallback(
+    (clientId: string, roles: readonly string[]) =>
+      Boolean(user?.appRoles?.[clientId]?.some((role) => roles.includes(role))),
+    [user],
+  );
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, login, logout, can, refresh }),
-    [status, user, login, logout, can, refresh],
+    () => ({ status, user, login, logout, can, hasAppRole, refresh }),
+    [status, user, login, logout, can, hasAppRole, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

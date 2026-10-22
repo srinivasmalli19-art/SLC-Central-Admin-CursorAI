@@ -1,0 +1,54 @@
+# SLC central identity provider — LOCAL DEVELOPMENT ONLY.
+#
+# Starts Keycloak (the central login service for every SLC admin) plus its own
+# PostgreSQL database, and imports the `slc` realm from ./realm-slc.json on
+# first start.
+#
+#   docker compose -f infra/keycloak/docker-compose.yml up -d
+#
+# Keycloak admin console: http://localhost:8080/admin  (admin / admin — dev only)
+# SLC realm issuer:       http://localhost:8080/realms/slc
+#
+# Production does NOT use this file. See infra/keycloak/README.md.
+
+services:
+  keycloak-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak-dev-only
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U keycloak -d keycloak']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: ['start-dev', '--import-realm']
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak-dev-only
+      KC_HOSTNAME: http://localhost:8080
+      KC_HEALTH_ENABLED: 'true'
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./realm-slc.json:/opt/keycloak/data/import/realm-slc.json:ro
+    extra_hosts:
+      # Lets Keycloak reach the Central Admin API on the host for back-channel
+      # logout (http://host.docker.internal:4000/...).
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+
+volumes:
+  keycloak-db-data:
