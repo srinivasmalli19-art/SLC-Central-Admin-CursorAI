@@ -60,7 +60,21 @@ describe('production realm export (infra/keycloak/production)', () => {
   it('carries no test accounts, dev secrets or localhost addresses', () => {
     const text = readFileSync(path.join(prodDir, 'realm-slc.prod.json'), 'utf8');
     const prod = JSON.parse(text) as { users: { username: string; serviceAccountClientId?: string }[] };
-    expect(prod.users.every((u) => u.serviceAccountClientId)).toBe(true);
+    // Service accounts, plus exactly one first Super Admin taken from the
+    // environment (no committed email or password).
+    const people = prod.users.filter((u) => !u.serviceAccountClientId) as {
+      username: string;
+      credentials?: { value: string; temporary: boolean }[];
+      requiredActions?: string[];
+      groups?: string[];
+    }[];
+    expect(people).toHaveLength(1);
+    expect(people[0]!.username).toBe('${FIRST_SUPER_ADMIN_EMAIL}');
+    expect(people[0]!.credentials).toEqual([
+      { type: 'password', value: '${FIRST_SUPER_ADMIN_TEMP_PASSWORD}', temporary: true },
+    ]);
+    expect(people[0]!.requiredActions).toEqual(['UPDATE_PASSWORD', 'CONFIGURE_TOTP']);
+    expect(people[0]!.groups).toEqual(['/slc-super-admins']);
     expect(text).not.toMatch(/dev-only|localhost|127\.0\.0\.1|host\.docker\.internal/);
   });
 });

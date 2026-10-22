@@ -7,7 +7,8 @@
 #   from environment placeholders) on first start only. Later restarts keep
 #   whatever is in the database.
 # - Runs behind a TLS-terminating proxy (Render, Cloudflare): plain HTTP inside,
-#   X-Forwarded-* headers trusted, public hostname from KC_HOSTNAME.
+#   X-Forwarded-* headers trusted, public hostname from KC_HOSTNAME, or on
+#   Render from the service's own address (see start.sh).
 
 FROM quay.io/keycloak/keycloak:26.4.0 AS builder
 ENV KC_DB=postgres \
@@ -18,6 +19,7 @@ RUN /opt/keycloak/bin/kc.sh build
 FROM quay.io/keycloak/keycloak:26.4.0
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
 COPY realm-slc.prod.json /opt/keycloak/data/import/realm-slc.json
+COPY start.sh /opt/keycloak/bin/slc-start.sh
 
 ENV KC_HTTP_ENABLED=true \
     KC_HTTP_PORT=8080 \
@@ -27,5 +29,4 @@ ENV KC_HTTP_ENABLED=true \
 
 EXPOSE 8080
 USER 1000
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
-CMD ["start", "--optimized", "--import-realm"]
+ENTRYPOINT ["/opt/keycloak/bin/slc-start.sh"]

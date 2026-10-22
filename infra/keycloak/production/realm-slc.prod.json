@@ -670,6 +670,28 @@
   ],
   "users": [
     {
+      "username": "${FIRST_SUPER_ADMIN_EMAIL}",
+      "email": "${FIRST_SUPER_ADMIN_EMAIL}",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "SLC",
+      "lastName": "Super Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${FIRST_SUPER_ADMIN_TEMP_PASSWORD}",
+          "temporary": true
+        }
+      ],
+      "requiredActions": [
+        "UPDATE_PASSWORD",
+        "CONFIGURE_TOTP"
+      ],
+      "groups": [
+        "/slc-super-admins"
+      ]
+    },
+    {
       "username": "service-account-central-admin-api",
       "enabled": true,
       "serviceAccountClientId": "central-admin-api",

@@ -3,7 +3,10 @@
  * Builds the PRODUCTION realm import (realm-slc.prod.json) from the dev realm
  * (../realm-slc.json), so both stay in step:
  *
- *  - drops the dev test accounts (superadmin@slc.local, support@slc.local);
+ *  - drops the dev test accounts (superadmin@slc.local, support@slc.local)
+ *    and adds ONE first Super Admin whose email and temporary password come
+ *    from the environment (FIRST_SUPER_ADMIN_EMAIL, FIRST_SUPER_ADMIN_TEMP_PASSWORD),
+ *    who must choose a new password and set up an authenticator at first sign-in;
  *  - replaces every client secret with an environment placeholder;
  *  - replaces localhost URLs with each app's real address from the environment;
  *  - keeps roles, groups, scopes, MFA, password and brute-force policy as is.
@@ -37,6 +40,19 @@ const CLIENTS = {
   'nearsip-admin': { secretEnv: 'KC_SECRET_NEARSIP' },
 };
 
+/** Imported once, on Keycloak's first start; later restarts never touch it. */
+export const FIRST_SUPER_ADMIN = {
+  username: '${FIRST_SUPER_ADMIN_EMAIL}',
+  email: '${FIRST_SUPER_ADMIN_EMAIL}',
+  emailVerified: true,
+  enabled: true,
+  firstName: 'SLC',
+  lastName: 'Super Admin',
+  credentials: [{ type: 'password', value: '${FIRST_SUPER_ADMIN_TEMP_PASSWORD}', temporary: true }],
+  requiredActions: ['UPDATE_PASSWORD', 'CONFIGURE_TOTP'],
+  groups: ['/slc-super-admins'],
+};
+
 const isLocal = (value) => /localhost|127\.0\.0\.1|host\.docker\.internal/.test(value);
 
 /** http://localhost:5173/api/v1/... -> ${CENTRAL_ADMIN_URL}/api/v1/... */
@@ -50,8 +66,12 @@ function toProdUrl(value, urlEnv) {
 export function makeProdRealm(dev) {
   const realm = structuredClone(dev);
 
-  // Only service-account users survive; people are invited through Central Admin.
-  realm.users = (realm.users ?? []).filter((u) => u.serviceAccountClientId);
+  // Only service-account users survive, plus the first Super Admin (from the
+  // environment) so someone can sign in to Central Admin and invite the rest.
+  realm.users = [
+    FIRST_SUPER_ADMIN,
+    ...(realm.users ?? []).filter((u) => u.serviceAccountClientId),
+  ];
 
   for (const client of realm.clients) {
     const spec = CLIENTS[client.clientId];

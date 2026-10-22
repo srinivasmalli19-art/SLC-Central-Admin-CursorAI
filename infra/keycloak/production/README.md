@@ -1,78 +1,96 @@
-# SLC central login in production (Keycloak on Render)
+# SLC Central Admin and central login in production (Render)
 
-**Decision:** Keycloak runs on **Render**, region **Singapore** (closest Render
-region to India), as a Docker web service with its own Render PostgreSQL, at
-**`https://id.slcvet.com`** behind Cloudflare. Render already hosts the SLC Vet
-and Stock Management backends, handles HTTPS certificates and deploys, and runs
-managed PostgreSQL with backups, so there is no server to patch.
+**Decision:** both run on **Render**, region **Singapore** (closest Render region
+to India), from one Blueprint (`render.yaml` at the repo root):
 
-Size: a **2 GB** instance (Keycloak needs about 1.25 GB to run); the database
-can start small. Check current prices on render.com/pricing.
+| Service | What | Address | Size |
+| --- | --- | --- | --- |
+| `slcvet-id` | Keycloak, the central login with MFA | `https://slcvet-id.onrender.com` | 2 GB (Keycloak needs about 1.25 GB) |
+| `slcvet-admin` | Central Admin: API and web app on one address | `https://slcvet-admin.onrender.com` | 512 MB |
+| `slc-keycloak-db`, `slc-central-admin-db` | One PostgreSQL each | private to Render | smallest |
+
+Custom domains (`id.slcvet.com`, `admin.slcvet.com`) can be added later; see
+"Custom domains" below. Check current prices on render.com/pricing.
 
 ## What is in this folder
 
 | File | What |
 | --- | --- |
 | `Dockerfile` | Keycloak 26.4.0, optimized build, production start, behind a proxy |
-| `realm-slc.prod.json` | The `slc` realm for production: **no test accounts, no secrets**; secrets and app URLs come from environment variables at first start |
+| `start.sh` | Starts Keycloak with its public address (from Render, or `KC_HOSTNAME`) |
+| `realm-slc.prod.json` | The `slc` realm for production: no test accounts, no secrets; one first Super Admin whose email and temporary password come from the environment |
 | `make-prod-realm.mjs` | Regenerates the production realm from `../realm-slc.json` (a test fails if they drift apart) |
-| `../../../render.yaml` | Render Blueprint creating the database and the Keycloak service |
 
-Checked on 14 Oct 2026: this realm imported into Keycloak 26.4.0 started in
-production mode, and the live check passed 13/13 (2 checks skipped because
-they need the dev-only test admin).
+## Go live, step by step
 
-## Deploy, step by step
+1. **Render account.** Sign up at render.com with GitHub, and let Render see
+   the `SLC-Central-Admin-CursorAI` repository.
+2. **Create everything.** Render → **New** → **Blueprint** → pick
+   `SLC-Central-Admin-CursorAI` (branch `main`). Render shows the four
+   resources and asks for one value:
+   - `FIRST_SUPER_ADMIN_EMAIL`: your own email, in lower case.
 
-1. **Render → New → Blueprint**, pick the `SLC-Central-Admin-CursorAI`
-   repository. Render reads `render.yaml` and asks for:
-   - `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD`: a temporary
-     Keycloak console login (long random password, keep it in a password manager);
-   - `STOCK_API_URL`: the Stock Management backend's base URL (where
-     `/api/auth/sso/...` lives);
-   - `PASUMITHRA_ADMIN_URL`: the Pasumithra admin portal's URL.
+   Press **Apply**. The first build takes about 10 minutes; Keycloak starts
+   before Central Admin can sign anyone in.
+3. **Check the addresses.** In Render, each service shows its address at the
+   top. If they are exactly `https://slcvet-id.onrender.com` and
+   `https://slcvet-admin.onrender.com`, go on. If Render added letters (the name
+   was taken), see "If an address is different" below.
+4. **Your temporary password.** Render → `slcvet-id` → **Environment** → reveal
+   `FIRST_SUPER_ADMIN_TEMP_PASSWORD`.
+5. **First sign-in.** Open `https://slcvet-admin.onrender.com` → **Sign in with
+   SLC Account** → your email and the temporary password. Keycloak makes you
+   choose your own password and add an authenticator app (Google
+   Authenticator, Microsoft Authenticator…). You land on the Central Admin
+   dashboard as Super Admin.
+6. **Invite the others** from **Admin access**. Until an email service is set up
+   (step 8), set each new person's temporary password in the Keycloak console:
+   `https://slcvet-id.onrender.com/admin` → realm `slc` → Users → the person →
+   Credentials → Set password (Temporary on).
+7. **Keycloak console login.** User `slc-console-admin`; password in Render →
+   `slcvet-id` → Environment → `KC_BOOTSTRAP_ADMIN_PASSWORD`. Later, replace it
+   with a named admin with an authenticator (master realm → Users), then delete
+   `slc-console-admin`.
+8. **Email (later).** Keycloak console → realm `slc` → Realm settings → Email:
+   your SMTP details. Then in Render → `slcvet-admin` → Environment set
+   `KEYCLOAK_SEND_INVITE_EMAIL=true`, so invitations go out by email.
 
-   **Every app URL must be set.** If one is empty Keycloak refuses to start
-   ("A redirect URI is not a valid URI") — on purpose, so a half-configured
-   server never comes up. If an app has no live address yet, put its planned
-   address.
-2. **Domain:** in the Render service → Settings → Custom domains, add
-   `id.slcvet.com`. In Cloudflare DNS add the `CNAME id → <service>.onrender.com`
-   it shows (proxied), and set SSL/TLS mode to **Full (strict)**.
-3. **First start** imports the realm (about a minute). Check
-   `https://id.slcvet.com/realms/slc/.well-known/openid-configuration` loads.
-4. **Lock down the Keycloak console:**
-   - sign in at `https://id.slcvet.com/admin` with the bootstrap login, create
-     a named admin in the `master` realm, give it the `admin` role, sign in as
-     it, set up its authenticator (Account → Signing in), then delete the
-     temporary bootstrap admin;
-   - in Cloudflare → Security → WAF, add a custom rule: **Block** when
-     *URI Path starts with `/admin/master`* or *starts with `/realms/master`*,
-     unless the request comes from your office IP. Do **not** block
-     `/admin/realms/slc` — Central Admin uses it (with its own service account).
-5. **Email:** Keycloak console → realm `slc` → Realm settings → Email: add your
-   SMTP details, so invitation and password-reset emails go out.
-6. **Connect Central Admin:** copy the generated `KC_SECRET_CENTRAL_ADMIN` and
-   `KC_SECRET_CENTRAL_ADMIN_API` from the Render service's Environment page into
-   Central Admin's settings:
-   ```
-   OIDC_ISSUER_URL=https://id.slcvet.com/realms/slc
-   OIDC_CLIENT_ID=central-admin
-   OIDC_CLIENT_SECRET=<KC_SECRET_CENTRAL_ADMIN>
-   KEYCLOAK_ADMIN_CLIENT_ID=central-admin-api
-   KEYCLOAK_ADMIN_CLIENT_SECRET=<KC_SECRET_CENTRAL_ADMIN_API>
-   # Backup (break-glass) password sign-in — see docs/SLC-CENTRAL-SSO.md
-   PASSWORD_LOGIN_ENABLED=true
-   PASSWORD_LOGIN_ALLOWED_EMAILS=<one or two named people>
-   MFA_ENCRYPTION_KEY=<openssl rand -base64 32>
-   ```
-7. **First real admin:** on the Central Admin server create the break-glass
-   account and its authenticator (`bootstrap:admin`, then `mfa:enroll`), sign
-   in with it, and invite everyone else from **Admin access** — they get an
-   email to set their own password and authenticator app.
-8. **Prove it:** run the live check from a machine that can reach Keycloak,
-   against a **staging** copy rather than production (it creates and deletes
-   one test admin): `KEYCLOAK_URL=https://<staging> npm run -w @slc/api keycloak:live-check`.
+### If an address is different
+
+The realm is imported once, at Keycloak's first start, with Central Admin's
+address in it. If Render gave different addresses:
+
+1. Render → `slcvet-admin` → Environment: set `OIDC_ISSUER_URL` to
+   `<Keycloak address>/realms/slc`. Save (Central Admin restarts).
+2. Render → `slcvet-id` → Environment: set `CENTRAL_ADMIN_URL` and
+   `CENTRAL_ADMIN_API_URL` to the Central Admin address.
+3. Because the realm was already imported, also fix it once in the Keycloak
+   console: realm `slc` → Clients → `central-admin` → replace
+   `https://slcvet-admin.onrender.com` with the real address in Valid redirect
+   URIs, Valid post logout redirect URIs, Web origins and Backchannel logout
+   URL. Save.
+
+### Custom domains
+
+1. Render → service → Settings → Custom domains: add `id.slcvet.com`
+   (Keycloak) and `admin.slcvet.com` (Central Admin). In Cloudflare DNS add the
+   CNAME records Render shows (proxied), SSL/TLS mode **Full (strict)**.
+2. `slcvet-id` → Environment: `KC_HOSTNAME=https://id.slcvet.com`.
+   `slcvet-admin` → Environment: `WEB_BASE_URL` and `API_BASE_URL` =
+   `https://admin.slcvet.com`, `OIDC_ISSUER_URL=https://id.slcvet.com/realms/slc`.
+3. Keycloak console → Clients → `central-admin`: add the new addresses as in
+   "If an address is different".
+4. Cloudflare → Security → WAF: block `/admin/master` and `/realms/master`
+   except from your office IP. Do **not** block `/admin/realms/slc`.
+
+### Backup (break-glass) password sign-in
+
+Off at first (`PASSWORD_LOGIN_ENABLED=false`). To turn it on for one or two
+named people: Render → `slcvet-admin` → Shell, for each person run
+`BOOTSTRAP_ADMIN_EMAIL=<email> npm run bootstrap:admin` and
+`npm run -w @slc/api mfa:enroll -- <email>`; then in Environment set
+`PASSWORD_LOGIN_ENABLED=true` and `PASSWORD_LOGIN_ALLOWED_EMAILS=<emails>`.
+`MFA_ENCRYPTION_KEY` is already generated; never change it afterwards.
 
 ## Later changes to the realm
 
@@ -85,5 +103,8 @@ Central Admin for people and their roles), and copy lasting changes back into
 
 - Render PostgreSQL keeps automatic backups; check the retention for your plan
   and do a test restore once.
-- To update Keycloak, change the version in both `FROM` lines, run the live
-  check against staging, then deploy (Render → Manual deploy).
+- To update Keycloak, change the version in both `FROM` lines, test, then
+  deploy (Render → Manual deploy).
+- Checked on 22 Oct 2026: this realm imported into Keycloak 26.4.0; the first
+  Super Admin signed in through Central Admin served on one address, choosing
+  a new password and authenticator as required.

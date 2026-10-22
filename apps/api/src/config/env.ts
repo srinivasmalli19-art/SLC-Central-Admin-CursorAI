@@ -34,6 +34,11 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().max(65535).default(4000),
   API_BASE_URL: z.string().url().default('http://localhost:4000'),
   WEB_BASE_URL: z.string().url().default('http://localhost:5173'),
+  /**
+   * Folder with the built web app (apps/web/dist). When set, the API also
+   * serves the web app, so both live on one address (as on Render).
+   */
+  WEB_DIST_DIR: z.string().min(1).optional(),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required').optional(),
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
@@ -205,13 +210,21 @@ export interface AppConfig {
     mfaKey: string | null;
   };
   integration: { egressAllowlist: string[] };
+  /** Built web app the API serves itself, or null (web served separately). */
+  webDistDir: string | null;
 }
 
 /**
  * Validate `process.env` and return a typed configuration object.
  * Throws a single, aggregated error when validation fails.
  */
-export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
+export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
+  // On Render, the service's own public address is known at runtime
+  // (RENDER_EXTERNAL_URL); use it unless the addresses are set explicitly.
+  const renderUrl = input.RENDER_EXTERNAL_URL;
+  const source: NodeJS.ProcessEnv = renderUrl
+    ? { WEB_BASE_URL: renderUrl, API_BASE_URL: renderUrl, ...input }
+    : input;
   const parsed = envSchema.safeParse(source);
 
   if (!parsed.success) {
@@ -404,6 +417,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
           }
         : null,
     firebaseBridge,
+    webDistDir: env.WEB_DIST_DIR ?? null,
     nearsip:
       env.NEARSIP_SUPABASE_URL && env.NEARSIP_SUPABASE_SERVICE_ROLE_KEY
         ? { url: env.NEARSIP_SUPABASE_URL.replace(/\/$/, ''), serviceRoleKey: env.NEARSIP_SUPABASE_SERVICE_ROLE_KEY }
