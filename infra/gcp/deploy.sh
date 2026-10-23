@@ -90,9 +90,22 @@ fi
 
 # -------------------------------------------------------------------- APIs
 say "Turning on the Google Cloud services this needs (a minute or two)"
-gcloud services enable run.googleapis.com sqladmin.googleapis.com secretmanager.googleapis.com \
-  cloudbuild.googleapis.com artifactregistry.googleapis.com compute.googleapis.com \
-  servicenetworking.googleapis.com iam.googleapis.com
+NEEDED=(run.googleapis.com sqladmin.googleapis.com secretmanager.googleapis.com
+  cloudbuild.googleapis.com artifactregistry.googleapis.com compute.googleapis.com
+  servicenetworking.googleapis.com iam.googleapis.com)
+# Only ask for the ones not yet on (a re-run then makes no requests), and wait
+# and retry when Google says "too many requests in a minute" (error 429).
+for attempt in 1 2 3 4 5 6; do
+  ENABLED="$(gcloud services list --enabled --format='value(config.name)' 2>/dev/null || true)"
+  MISSING=()
+  for api in "${NEEDED[@]}"; do grep -qx "$api" <<<"$ENABLED" || MISSING+=("$api"); done
+  [ "${#MISSING[@]}" -eq 0 ] && break
+  if gcloud services enable "${MISSING[@]}"; then break; fi
+  [ "$attempt" -eq 6 ] && fail "Google kept refusing to turn on the services; wait 5 minutes"
+  note "Google asked us to slow down; trying again in 60 seconds (attempt $attempt of 6)"
+  sleep 60
+done
+note "All needed services are on"
 
 # ----------------------------------------------------------------- secrets
 secret_value() { gcloud secrets versions access latest --secret="$1" 2>/dev/null; }
