@@ -224,6 +224,11 @@ IMAGES="$REGION-docker.pkg.dev/$PROJECT/$AR_REPO"
 # Cloud Run addresses are fixed by service name, project number and region.
 KC_URL="https://$KC_SERVICE-$PROJECT_NUMBER.$REGION.run.app"
 CA_URL="https://$CA_SERVICE-$PROJECT_NUMBER.$REGION.run.app"
+# Own domain, once add-domain.sh has switched to it (e.g. admin.slcvet.com).
+ID_HOST="$(secret_value slc-id-host || true)"
+ADMIN_HOST="$(secret_value slc-admin-host || true)"
+[ -n "$ID_HOST" ] && KC_URL="https://$ID_HOST"
+[ -n "$ADMIN_HOST" ] && CA_URL="https://$ADMIN_HOST"
 RUN_FLAGS=(--region="$REGION" --service-account="$RUN_SA" --allow-unauthenticated --port=8080
   --execution-environment=gen2 --cpu-boost --timeout=300 --min-instances=0
   --network=default --subnet=default --vpc-egress=private-ranges-only --quiet)

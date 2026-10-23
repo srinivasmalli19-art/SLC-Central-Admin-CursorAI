@@ -61,9 +61,14 @@ the seed at start-up (`start-central-admin.sh`).
   the Keycloak console (`<login address>/admin`, user `slc-console-admin`,
   password: `gcloud secrets versions access latest --secret=slc-kc-console-password`
   in Cloud Shell) → realm `slc` → Users → person → Credentials → Set password.
-- **Own domain** (`admin.slcvet.com`, `id.slcvet.com`): Cloud Run → service →
-  Manage custom domains, then update `KC_HOSTNAME`, `WEB_BASE_URL`,
-  `API_BASE_URL`, `OIDC_ISSUER_URL` and the `central-admin` client's addresses
-  in the Keycloak console.
+- **Own domain** (`admin.slcvet.com`, `id.slcvet.com`): run
+  `bash infra/gcp/add-domain.sh` in Cloud Shell. Cloud Run in Mumbai cannot map
+  a domain directly, so the script sets up Google's recommended global HTTPS
+  load balancer with a free Google-managed certificate (about US$18 a month).
+  It prints two `A` records to add where slcvet.com's DNS is managed; run it
+  again after adding them and, once the certificate is active (15–60 minutes),
+  it adds the new address to the login's `central-admin` client, switches both
+  services to the new names, remembers them for later `deploy.sh` runs, and
+  checks the hand-over. The main slcvet.com site is not touched.
 - **Backup (break-glass) password sign-in** is off. It can be enabled later
   with a Cloud Run job that runs `bootstrap:admin` and `mfa:enroll`.
