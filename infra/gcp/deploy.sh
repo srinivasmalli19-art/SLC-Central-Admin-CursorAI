@@ -215,16 +215,42 @@ RUN_FLAGS=(--region="$REGION" --service-account="$RUN_SA" --allow-unauthenticate
   --execution-environment=gen2 --cpu-boost --timeout=300 --min-instances=0
   --network=default --subnet=default --vpc-egress=private-ranges-only --quiet)
 
+# Settings go in through small YAML files, so values may contain any
+# character (an email address has "@", URLs have ":" and "/").
+ENV_DIR="$(mktemp -d)"
+trap 'rm -rf "$ENV_DIR"' EXIT
+env_file() { # env_file FILE KEY=VALUE...
+  local file="$1" pair
+  shift
+  : >"$file"
+  for pair in "$@"; do
+    printf '%s: "%s"\n' "${pair%%=*}" "${pair#*=}" >>"$file"
+  done
+}
+KC_ENV_FILE="$ENV_DIR/keycloak.yaml"
+CA_ENV_FILE="$ENV_DIR/central-admin.yaml"
+env_file "$KC_ENV_FILE" \
+  "KC_HOSTNAME=$KC_URL" "KC_DB_URL_HOST=$DB_IP" "KC_DB_URL_DATABASE=keycloak" "KC_DB_USERNAME=keycloak" \
+  "KC_BOOTSTRAP_ADMIN_USERNAME=slc-console-admin" "FIRST_SUPER_ADMIN_EMAIL=$EMAIL" \
+  "CENTRAL_ADMIN_URL=$CA_URL" "CENTRAL_ADMIN_API_URL=$CA_URL" \
+  "STOCK_URL=$STOCK_URL" "STOCK_API_URL=$STOCK_API_URL" "PASUNESTAM_URL=$PASUNESTAM_URL" \
+  "PASUMITHRA_ADMIN_URL=$PASUMITHRA_ADMIN_URL" "SLCVET_URL=$SLCVET_URL"
+env_file "$CA_ENV_FILE" \
+  "WEB_BASE_URL=$CA_URL" "API_BASE_URL=$CA_URL" "COOKIE_SECURE=true" \
+  "OIDC_ISSUER_URL=$KC_URL/realms/slc" "OIDC_CLIENT_ID=central-admin" \
+  "KEYCLOAK_ADMIN_CLIENT_ID=central-admin-api" "KEYCLOAK_SEND_INVITE_EMAIL=false" \
+  "PASSWORD_LOGIN_ENABLED=false" "IDP_TIMEOUT_SECONDS=90"
+
 say "Starting the central login ($KC_SERVICE)"
 gcloud run deploy "$KC_SERVICE" --image="$IMAGES/keycloak:$TAG" "${RUN_FLAGS[@]}" \
   --cpu=2 --memory=2Gi --max-instances=1 \
-  --set-env-vars="^@^KC_HOSTNAME=$KC_URL@KC_DB_URL_HOST=$DB_IP@KC_DB_URL_DATABASE=keycloak@KC_DB_USERNAME=keycloak@KC_BOOTSTRAP_ADMIN_USERNAME=slc-console-admin@FIRST_SUPER_ADMIN_EMAIL=$EMAIL@CENTRAL_ADMIN_URL=$CA_URL@CENTRAL_ADMIN_API_URL=$CA_URL@STOCK_URL=$STOCK_URL@STOCK_API_URL=$STOCK_API_URL@PASUNESTAM_URL=$PASUNESTAM_URL@PASUMITHRA_ADMIN_URL=$PASUMITHRA_ADMIN_URL@SLCVET_URL=$SLCVET_URL" \
+  --env-vars-file="$KC_ENV_FILE" \
   --set-secrets="KC_DB_PASSWORD=slc-kc-db-password:latest,KC_BOOTSTRAP_ADMIN_PASSWORD=slc-kc-console-password:latest,FIRST_SUPER_ADMIN_TEMP_PASSWORD=slc-first-admin-temp-password:latest,KC_SECRET_CENTRAL_ADMIN=slc-kc-secret-central-admin:latest,KC_SECRET_CENTRAL_ADMIN_API=slc-kc-secret-central-admin-api:latest,KC_SECRET_NEARSIP=slc-kc-secret-nearsip:latest"
 
 say "Starting Central Admin ($CA_SERVICE)"
 gcloud run deploy "$CA_SERVICE" --image="$IMAGES/central-admin:$TAG" "${RUN_FLAGS[@]}" \
   --cpu=1 --memory=1Gi --max-instances=2 \
-  --set-env-vars="^@^WEB_BASE_URL=$CA_URL@API_BASE_URL=$CA_URL@COOKIE_SECURE=true@OIDC_ISSUER_URL=$KC_URL/realms/slc@OIDC_CLIENT_ID=central-admin@KEYCLOAK_ADMIN_CLIENT_ID=central-admin-api@KEYCLOAK_SEND_INVITE_EMAIL=false@PASSWORD_LOGIN_ENABLED=false@IDP_TIMEOUT_SECONDS=90" \
+  --env-vars-file="$CA_ENV_FILE" \
   --set-secrets="DATABASE_URL=slc-ca-database-url:latest,OIDC_CLIENT_SECRET=slc-kc-secret-central-admin:latest,KEYCLOAK_ADMIN_CLIENT_SECRET=slc-kc-secret-central-admin-api:latest,MFA_ENCRYPTION_KEY=slc-mfa-key:latest"
 
 # ------------------------------------------------------------------ checks
