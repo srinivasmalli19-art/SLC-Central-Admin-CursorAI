@@ -21,7 +21,11 @@ COPY --from=builder /opt/keycloak/ /opt/keycloak/
 COPY realm-slc.prod.json /opt/keycloak/data/import/realm-slc.json
 COPY start.sh /opt/keycloak/bin/slc-start.sh
 
+# KC_CACHE=local: one instance (Render, or Cloud Run with max 1 instance), so
+# no searching for other Keycloak nodes. Sign-in sessions are stored in the
+# database, so they survive restarts and scale-to-zero.
 ENV KC_HTTP_ENABLED=true \
+    KC_CACHE=local \
     KC_HTTP_PORT=8080 \
     KC_PROXY_HEADERS=xforwarded \
     KC_LOG_LEVEL=info \

@@ -222,6 +222,23 @@ afterAll(async () => {
 });
 
 describe('Central SSO sign-in (OIDC)', () => {
+  it('wakes the identity provider when the login page loads, at most once a minute', async () => {
+    const { resetOidcClientCache, wakeIdentityProvider } = await import('./oidcClient.js');
+    resetOidcClientCache();
+    const spy = vi.spyOn(globalThis, 'fetch');
+    try {
+      await request(app).get('/api/v1/auth/config');
+      const woke = spy.mock.calls.filter(([url]) => String(url) === `${issuer}/.well-known/openid-configuration`);
+      expect(woke).toHaveLength(1);
+      // A second page load straight after does not wake it again; a minute later it does.
+      expect(wakeIdentityProvider(Date.now() + 1_000)).toBe(false);
+      expect(wakeIdentityProvider(Date.now() + 61_000)).toBe(true);
+    } finally {
+      spy.mockRestore();
+      resetOidcClientCache();
+    }
+  });
+
   it('advertises SSO-only sign-in and refuses the password form', async () => {
     const options = await request(app).get('/api/v1/auth/config');
     expect(options.body.data).toEqual({

@@ -1,0 +1,35 @@
+# Builds the two images for Google Cloud Run and stores them in Artifact
+# Registry. Run by infra/gcp/deploy.sh; substitutions come from there.
+steps:
+  - id: keycloak
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/slc/keycloak:${_TAG}
+      - infra/keycloak/production
+    waitFor: ['-']
+
+  - id: central-admin
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - infra/gcp/central-admin.Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/slc/central-admin:${_TAG}
+      - .
+    waitFor: ['-']
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/slc/keycloak:${_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/slc/central-admin:${_TAG}
+
+substitutions:
+  _REGION: asia-south1
+  _TAG: latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s

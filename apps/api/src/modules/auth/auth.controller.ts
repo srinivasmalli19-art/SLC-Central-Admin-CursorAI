@@ -5,7 +5,7 @@ import type { AuthOptions, LogoutResult } from '@slc/shared';
 import { config } from '../../config/env.js';
 import { sendSuccess } from '../../http/responses.js';
 import { logger } from '../../lib/logger.js';
-import { buildLogoutUrl } from './oidc/oidcClient.js';
+import { buildLogoutUrl, wakeIdentityProvider } from './oidc/oidcClient.js';
 import { getIdTokenHint } from './session.service.js';
 import { clearCsrfCookie, clearSessionCookie, issueCsrfCookie, setSessionCookie } from './cookies.js';
 import { changePassword, getCurrentUser, login, logout } from './auth.service.js';
@@ -102,6 +102,7 @@ export async function changePasswordController(
 
 /** GET /auth/config — public: which sign-in methods the login page should offer. */
 export function authOptionsController(_req: Request, res: Response): void {
+  wakeIdentityProvider();
   const options: AuthOptions = {
     passwordLoginEnabled: config.passwordLoginEnabled,
     ssoEnabled: Boolean(config.oidc),
