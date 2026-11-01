@@ -163,52 +163,112 @@ export const auditApi = {
 };
 
 // ---- SLC apps managed from Central Admin ----------------------------------------
+export type JmKind = 'lands' | 'alerts' | 'vets' | 'stories' | 'videos' | 'fieldPosts';
+export type JmProfileType = 'livestock' | 'land' | 'both';
 export interface JmUser {
   uid: string;
   name: string;
   phone: string;
-  role: string;
+  profileType: string;
   village: string | null;
   district: string | null;
-  isVerified: boolean;
-  isProfileComplete: boolean;
+  state: string | null;
+  /** null = no sign-in account any more */
+  disabled: boolean | null;
 }
-export interface JmAlert {
+export interface JmItem {
   id: string;
+  kind: JmKind;
   title: string;
-  disease: string;
-  severity: string;
-  district: string;
+  subtitle: string;
+  ownerId: string | null;
+  hidden: boolean;
+  status: string | null;
+  createdAt: string | null;
+}
+export interface JmVet {
+  name: string;
+  sector: string;
+  designation: string;
+  services: string[];
+  experienceYears: number;
+  languages: string[];
   village: string;
-  isActive: boolean;
-  issuedAt: string | null;
-  reportedBy: string | null;
-  sourceAuthority: string;
+  district: string;
+  phone: string;
+  rating: number | null;
+  availability: string;
+  lat: number | null;
+  lng: number | null;
+}
+export type JmLang = 'en' | 'te' | 'hi';
+export type JmLocalized = Partial<Record<JmLang, string>>;
+export interface JmCropDefault {
+  id: string;
+  emoji: string;
+  order: number;
+  basis: string;
+  name: Record<JmLang, string>;
+  goodFor: Record<JmLang, string>;
+  risk: Record<JmLang, string>;
+  precautions: Record<JmLang, string>;
+}
+export interface JmCropEdit {
+  id: string;
+  emoji?: string;
+  order?: number;
+  hidden?: boolean;
+  reviewedBy?: string;
+  reviewedOn?: string;
+  name?: JmLocalized;
+  goodFor?: JmLocalized;
+  risk?: JmLocalized;
+  precautions?: JmLocalized;
+}
+export interface JmCropSettings {
+  sprayWarningDays?: number;
+  generalPrecautions?: Partial<Record<JmLang, string[]>>;
+  callVet?: JmLocalized;
+  disclaimer?: JmLocalized;
 }
 export interface JmSummary {
   users: number;
-  farmers: number;
-  shepherds: number;
-  vets: number;
-  vetsAwaitingVerification: number;
-  farms: number;
+  livestockOwners: number;
+  landProviders: number;
+  both: number;
+  lands: number;
   bookings: number;
-  activeDiseaseAlerts: number;
+  bookingsPending: number;
+  alerts: number;
+  vets: number;
+  stories: number;
+  videos: number;
+  chats: number;
+  fieldPosts: number;
+  fieldPostsHidden: number;
+  cropGuideEdits: number;
 }
+type JmPage<T> = { items: T[]; nextCursor: string | null };
+const JM = '/apps/jeevamitra';
+const enc = encodeURIComponent;
 
 export const jeevamitraApi = {
-  summary: () => api.get<JmSummary>('/apps/jeevamitra/summary'),
-  users: (q: { role?: string; verified?: boolean; after?: string } = {}) =>
-    api.get<{ items: JmUser[]; nextCursor: string | null }>(
-      `/apps/jeevamitra/users${toQueryString({ ...q, verified: q.verified === undefined ? undefined : String(q.verified), limit: 50 })}`,
-    ),
-  setVerified: (uid: string, verified: boolean) =>
-    api.post<{ user: JmUser; vetProfilesUpdated: number }>(`/apps/jeevamitra/users/${encodeURIComponent(uid)}/verification`, { verified }),
-  setDisabled: (uid: string, disabled: boolean) =>
-    api.post<{ uid: string; disabled: boolean }>(`/apps/jeevamitra/users/${encodeURIComponent(uid)}/account`, { disabled }),
-  alerts: (activeOnly = true) => api.get<{ alerts: JmAlert[] }>(`/apps/jeevamitra/alerts?activeOnly=${activeOnly}`),
-  setAlertActive: (id: string, active: boolean) =>
-    api.post<{ id: string; active: boolean }>(`/apps/jeevamitra/alerts/${encodeURIComponent(id)}/status`, { active }),
+  summary: () => api.get<JmSummary>(`${JM}/summary`),
+  users: (q: { profileType?: JmProfileType; phone?: string; after?: string } = {}) =>
+    api.get<JmPage<JmUser>>(`${JM}/users${toQueryString({ ...q, limit: 50 })}`),
+  setDisabled: (uid: string, disabled: boolean) => api.post<{ uid: string; disabled: boolean }>(`${JM}/users/${enc(uid)}/account`, { disabled }),
+  content: (kind: JmKind, after?: string) => api.get<JmPage<JmItem>>(`${JM}/content/${kind}${toQueryString({ after, limit: 50 })}`),
+  setHidden: (kind: JmKind, id: string, hidden: boolean) =>
+    api.post<{ id: string; hidden: boolean }>(`${JM}/content/${kind}/${enc(id)}/visibility`, { hidden }),
+  remove: (kind: JmKind, id: string) => api.delete<{ id: string; deleted: boolean; filesDeleted: number }>(`${JM}/content/${kind}/${enc(id)}`),
+  vet: (id: string) => api.get<{ vet: JmVet }>(`${JM}/vets/${enc(id)}`),
+  createVet: (vet: JmVet) => api.post<{ id: string }>(`${JM}/vets`, vet),
+  updateVet: (id: string, vet: JmVet) => api.put<{ id: string }>(`${JM}/vets/${enc(id)}`, vet),
+  cropGuides: () =>
+    api.get<{ defaults: JmCropDefault[]; defaultSettings: JmCropSettings; edits: JmCropEdit[]; settings: JmCropSettings | null }>(`${JM}/crop-guides`),
+  saveCropGuide: (id: string, edit: Omit<JmCropEdit, 'id'>) => api.put<{ id: string }>(`${JM}/crop-guides/${enc(id)}`, edit),
+  resetCropGuide: (id: string) => api.delete<{ id: string }>(`${JM}/crop-guides/${enc(id)}`),
+  saveCropSettings: (settings: JmCropSettings) => api.put<{ saved: boolean }>(`${JM}/crop-guide-settings`, settings),
 };
 
 export type NsRow = Record<string, unknown> & { id: string };

@@ -817,3 +817,16 @@ code {
   max-width: 60ch;
   margin: 8px 0 0;
 }
+
+/* Multi-line inputs (JeevaMitra crop cards): same font as other fields, so Telugu/Hindi render well. */
+textarea.field__input {
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+fieldset.field {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 10px 14px 14px;
+  margin: 12px 0 0;
+}

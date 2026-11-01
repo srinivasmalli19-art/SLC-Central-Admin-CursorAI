@@ -13,7 +13,7 @@ import { ROLE_KEYS, ROLE_PERMISSIONS } from '@slc/shared';
 
 import { createFakePrisma } from '../../../test/fakePrisma.js';
 import { hashToken } from '../../lib/tokens.js';
-import type { JeevaMitraStore, JmAlert, JmUser } from './jeevamitra/jeevamitra.store.js';
+import { toItem, type JeevaMitraStore, type JmCropGuideEdit, type JmCropSettings, type JmKind, type JmUser, type JmVet } from './jeevamitra/jeevamitra.model.js';
 
 const fake = vi.hoisted(() => ({ prisma: undefined as unknown }));
 vi.mock('../../db/prisma.js', async (importOriginal) => {
@@ -27,44 +27,53 @@ let supabase: http.Server;
 const CSRF = 'csrf';
 
 // ---- in-memory JeevaMitra ----------------------------------------------------
+// Raw Firestore-shaped docs per collection; rows go through the real toItem().
 const jm = {
   users: [] as JmUser[],
-  vetProfiles: [] as { id: string; ownerId: string; isVerified: boolean }[],
-  disabled: new Set<string>(),
-  alerts: [] as JmAlert[],
+  docs: {} as Record<JmKind, Record<string, Record<string, unknown>>>,
+  crops: new Map<string, JmCropGuideEdit>(),
+  settings: null as JmCropSettings | null,
+  deletedFiles: 0,
 };
 const memoryStore: JeevaMitraStore = {
   summary: async () => ({
-    users: jm.users.length,
-    farmers: jm.users.filter((u) => u.role === 'farmer').length,
-    shepherds: 0,
-    vets: jm.users.filter((u) => u.role === 'vet').length,
-    vetsAwaitingVerification: jm.users.filter((u) => u.role === 'vet' && !u.isVerified).length,
-    farms: 0,
-    bookings: 0,
-    activeDiseaseAlerts: jm.alerts.filter((a) => a.isActive).length,
+    users: jm.users.length, livestockOwners: jm.users.filter((u) => u.profileType === 'livestock').length, landProviders: 0, both: 0,
+    lands: Object.keys(jm.docs.lands).length, bookings: 0, bookingsPending: 0, alerts: 1, vets: Object.keys(jm.docs.vets).length,
+    stories: 0, videos: 0, chats: 0, fieldPosts: Object.keys(jm.docs.fieldPosts).length, fieldPostsHidden: 0, cropGuideEdits: jm.crops.size,
   }),
-  listUsers: async (f) => ({
-    items: jm.users.filter((u) => (!f.role || u.role === f.role) && (f.verified === undefined || u.isVerified === f.verified)).slice(0, f.limit),
-    nextCursor: null,
-  }),
+  listUsers: async (f) => ({ items: jm.users.filter((u) => (!f.profileType || u.profileType === f.profileType) && (!f.phone || u.phone === f.phone)).slice(0, f.limit), nextCursor: null }),
   getUser: async (uid) => jm.users.find((u) => u.uid === uid) ?? null,
-  setVetVerified: async (uid, verified) => {
-    jm.users.find((u) => u.uid === uid)!.isVerified = verified;
-    const profiles = jm.vetProfiles.filter((p) => p.ownerId === uid);
-    profiles.forEach((p) => (p.isVerified = verified));
-    return { vetProfilesUpdated: profiles.length };
-  },
   setAccountDisabled: async (uid, disabled) => {
-    if (disabled) jm.disabled.add(uid);
-    else jm.disabled.delete(uid);
+    jm.users.find((u) => u.uid === uid)!.disabled = disabled;
   },
-  listAlerts: async (f) => jm.alerts.filter((a) => !f.activeOnly || a.isActive),
-  setAlertActive: async (id, active) => {
-    const alert = jm.alerts.find((a) => a.id === id);
-    if (!alert) return false;
-    alert.isActive = active;
+  listItems: async (kind, f) => ({ items: Object.entries(jm.docs[kind]).slice(0, f.limit).map(([id, d]) => toItem(kind, id, d)), nextCursor: null }),
+  getItem: async (kind, id) => (jm.docs[kind][id] ? toItem(kind, id, jm.docs[kind][id]!) : null),
+  setHidden: async (kind, id, hidden) => {
+    const d = jm.docs[kind][id];
+    if (!d) return false;
+    d[kind === 'alerts' ? 'withdrawn' : 'hidden'] = hidden;
     return true;
+  },
+  deleteItem: async (kind, id) => {
+    if (!jm.docs[kind][id]) return { deleted: false, filesDeleted: 0 };
+    delete jm.docs[kind][id];
+    return { deleted: true, filesDeleted: kind === 'fieldPosts' ? 2 : 0 };
+  },
+  getVet: async (id) => (jm.docs.vets[id] ? (jm.docs.vets[id] as unknown as JmVet) : null),
+  createVet: async (vet, addedBy) => {
+    jm.docs.vets.new1 = { ...vet, addedBy };
+    return 'new1';
+  },
+  updateVet: async (id, vet) => {
+    if (!jm.docs.vets[id]) return false;
+    jm.docs.vets[id] = { ...jm.docs.vets[id], ...vet };
+    return true;
+  },
+  listCropGuideEdits: async () => ({ edits: [...jm.crops.values()], settings: jm.settings }),
+  saveCropGuide: async (edit) => void jm.crops.set(edit.id, edit),
+  deleteCropGuide: async (id) => jm.crops.delete(id),
+  saveCropSettings: async (settings) => {
+    jm.settings = settings;
   },
 };
 
@@ -156,14 +165,20 @@ beforeEach(() => {
   db = createFakePrisma(ROLE_KEYS, ROLE_PERMISSIONS);
   fake.prisma = db.prisma;
   jm.users = [
-    { uid: 'v1', name: 'Dr Rao', phone: '+91', role: 'vet', village: null, district: 'Guntur', isVerified: false, isProfileComplete: true },
-    { uid: 'f1', name: 'Farmer', phone: '+91', role: 'farmer', village: null, district: null, isVerified: false, isProfileComplete: true },
+    { uid: 'f1', name: 'Rama', phone: '9876543210', profileType: 'land', village: 'Ponnur', district: 'Guntur', state: 'Andhra Pradesh', disabled: false },
+    { uid: 'h1', name: 'Venkat', phone: '9123456780', profileType: 'livestock', village: null, district: null, state: null, disabled: true },
+    { uid: 'gone', name: 'Old', phone: '', profileType: '', village: null, district: null, state: null, disabled: null },
   ];
-  jm.vetProfiles = [{ id: 'vp1', ownerId: 'v1', isVerified: false }];
-  jm.disabled.clear();
-  jm.alerts = [
-    { id: 'a1', title: 'PPR outbreak', disease: 'PPR', severity: 'high', district: 'Guntur', village: 'X', isActive: true, issuedAt: null, reportedBy: 'f1', sourceAuthority: 'community' },
-  ];
+  jm.docs = {
+    lands: { l1: { ownerId: 'f1', title: 'Green Pasture', village: 'Ponnur', district: 'Guntur', acres: 4, price: 3000, unit: 'month' } },
+    alerts: { a1: { reporterId: 'f1', reporterName: 'Rama', disease: 'PPR', severity: 'high', species: 'Goat/Sheep', village: 'X', district: 'Guntur', withdrawn: false } },
+    vets: { v1: { name: 'Dr Rao', sector: 'Government', designation: 'Veterinary Officer', village: 'Ponnur', district: 'Guntur', phone: '9000000000' } },
+    stories: { s1: { title: 'Dairy success', authorName: 'Sunita' } },
+    videos: { w1: { title: 'Straw feeding', youtubeUrl: 'https://youtu.be/x' } },
+    fieldPosts: { p1: { kind: 'residue', ownerId: 'f1', crop: 'cotton', acres: 3, village: 'Ponnur', district: 'Guntur', status: 'available', hidden: false } },
+  };
+  jm.crops.clear();
+  jm.settings = null;
   sb.places = [
     { id: '1', name: 'Chai Point', type: 'drink' },
     { id: '2', name: 'Biryani House', type: 'food' },
@@ -181,73 +196,120 @@ afterAll(async () => {
 });
 
 describe('JeevaMitra from Central Admin', () => {
+  const post = (cookie: string, url: string, body: unknown) => request(app).post(url).set('Cookie', cookie).set('X-CSRF-Token', CSRF).send(body as object);
+  const put = (cookie: string, url: string, body: unknown) => request(app).put(url).set('Cookie', cookie).set('X-CSRF-Token', CSRF).send(body as object);
+  const del = (cookie: string, url: string) => request(app).delete(url).set('Cookie', cookie).set('X-CSRF-Token', CSRF);
+  const J = '/api/v1/apps/jeevamitra';
+  const vet = {
+    name: 'Dr Lakshmi', sector: 'Private', designation: 'Veterinary Assistant', services: ['Vaccination'], experienceYears: 5,
+    languages: ['Telugu', 'Hindi'], village: 'Tenali', district: 'Guntur', phone: '9888877777', rating: 4.5, availability: 'Available tomorrow',
+  };
+
   it('needs a jeevamitra-admin role (Central Admin roles alone are not enough)', async () => {
     const cookie = await signedIn({ 'stock-admin': ['manager'] });
-    expect((await request(app).get('/api/v1/apps/jeevamitra/summary').set('Cookie', cookie)).status).toBe(403);
+    expect((await request(app).get(`${J}/summary`).set('Cookie', cookie)).status).toBe(403);
   });
 
-  it('viewer can read but not verify', async () => {
+  it('viewer reads summary, users, every content list and crop cards, but cannot change anything', async () => {
     const cookie = await signedIn({ 'jeevamitra-admin': ['viewer'] });
-    const summary = await request(app).get('/api/v1/apps/jeevamitra/summary').set('Cookie', cookie);
-    expect(summary.status).toBe(200);
-    expect(summary.body.data.vetsAwaitingVerification).toBe(1);
-    const pending = await request(app).get('/api/v1/apps/jeevamitra/users?role=vet&verified=false').set('Cookie', cookie);
-    expect(pending.body.data.items.map((u: JmUser) => u.uid)).toEqual(['v1']);
-    const verify = await request(app)
-      .post('/api/v1/apps/jeevamitra/users/v1/verification')
-      .set('Cookie', cookie)
-      .set('X-CSRF-Token', CSRF)
-      .send({ verified: true });
-    expect(verify.status).toBe(403);
+    const sum = await request(app).get(`${J}/summary`).set('Cookie', cookie);
+    expect(sum.body.data?.lands, JSON.stringify(sum.body)).toBe(1);
+    const users = await request(app).get(`${J}/users?profileType=livestock`).set('Cookie', cookie);
+    expect(users.body.data.items.map((u: JmUser) => u.uid)).toEqual(['h1']);
+    const byPhone = await request(app).get(`${J}/users?phone=9876543210`).set('Cookie', cookie);
+    expect(byPhone.body.data.items.map((u: JmUser) => u.uid)).toEqual(['f1']);
+    for (const kind of ['lands', 'alerts', 'vets', 'stories', 'videos', 'fieldPosts']) {
+      const res = await request(app).get(`${J}/content/${kind}`).set('Cookie', cookie);
+      expect(res.status, kind).toBe(200);
+      expect(res.body.data.items).toHaveLength(1);
+    }
+    const fp = await request(app).get(`${J}/content/fieldPosts`).set('Cookie', cookie);
+    expect(fp.body.data.items[0]).toMatchObject({ title: 'cotton · 3 acres', ownerId: 'f1', status: 'available', hidden: false });
+    const crops = await request(app).get(`${J}/crop-guides`).set('Cookie', cookie);
+    expect(crops.body.data.defaults.length).toBeGreaterThanOrEqual(10);
+    expect(crops.body.data.defaults[0].name).toHaveProperty('te');
+    expect((await post(cookie, `${J}/content/lands/l1/visibility`, { hidden: true })).status).toBe(403);
+    expect((await post(cookie, `${J}/vets`, vet)).status).toBe(403);
+    expect((await request(app).get(`${J}/content/farms`).set('Cookie', cookie)).status).toBe(422);
   });
 
-  it('admin verifies a vet on both the account and the public vet profile, and it is audited', async () => {
+  it('manager pauses and resumes content (alerts use the app\'s withdrawn field) and it is audited', async () => {
     const cookie = await signedIn({ 'jeevamitra-admin': ['manager'] });
-    const res = await request(app)
-      .post('/api/v1/apps/jeevamitra/users/v1/verification')
-      .set('Cookie', cookie)
-      .set('X-CSRF-Token', CSRF)
-      .send({ verified: true });
-    expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ user: { isVerified: true }, vetProfilesUpdated: 1 });
-    expect(jm.vetProfiles[0]!.isVerified).toBe(true);
-    expect(db.state.auditLogs.at(-1)).toMatchObject({ action: 'JEEVAMITRA_VET_VERIFIED', targetId: 'v1' });
+    const pause = await post(cookie, `${J}/content/lands/l1/visibility`, { hidden: true });
+    expect(pause.status).toBe(200);
+    expect(jm.docs.lands.l1!.hidden).toBe(true);
+    expect(db.state.auditLogs.at(-1)).toMatchObject({ action: 'JEEVAMITRA_CONTENT_PAUSED', targetType: 'Land', targetId: 'l1' });
+    await post(cookie, `${J}/content/alerts/a1/visibility`, { hidden: true });
+    expect(jm.docs.alerts.a1!.withdrawn).toBe(true);
+    await post(cookie, `${J}/content/alerts/a1/visibility`, { hidden: false });
+    expect(jm.docs.alerts.a1!.withdrawn).toBe(false);
+    expect(db.state.auditLogs.at(-1)).toMatchObject({ action: 'JEEVAMITRA_CONTENT_RESUMED' });
+    expect((await post(cookie, `${J}/content/lands/nope/visibility`, { hidden: true })).status).toBe(404);
   });
 
-  it('refuses to verify a non-vet', async () => {
+  it('manager adds, edits and deletes vets, stories and videos; cannot delete user posts', async () => {
     const cookie = await signedIn({ 'jeevamitra-admin': ['manager'] });
-    const res = await request(app)
-      .post('/api/v1/apps/jeevamitra/users/f1/verification')
-      .set('Cookie', cookie)
-      .set('X-CSRF-Token', CSRF)
-      .send({ verified: true });
-    expect(res.status).toBe(422);
-  });
-
-  it('only super_admin disables accounts; admin moderates alerts', async () => {
-    const admin = await signedIn({ 'jeevamitra-admin': ['manager'] });
-    const denied = await request(app)
-      .post('/api/v1/apps/jeevamitra/users/f1/account')
-      .set('Cookie', admin)
-      .set('X-CSRF-Token', CSRF)
-      .send({ disabled: true });
+    const created = await post(cookie, `${J}/vets`, vet);
+    expect(created.status).toBe(201);
+    expect(jm.docs.vets.new1).toMatchObject({ name: 'Dr Lakshmi', languages: ['Telugu', 'Hindi'], lat: null });
+    expect((await post(cookie, `${J}/vets`, { ...vet, sector: 'Other' })).status).toBe(422);
+    expect((await post(cookie, `${J}/vets`, { ...vet, phone: '12' })).status).toBe(422);
+    const edited = await put(cookie, `${J}/vets/v1`, { ...vet, name: 'Dr Rao K' });
+    expect(edited.status).toBe(200);
+    expect(jm.docs.vets.v1!.name).toBe('Dr Rao K');
+    expect((await del(cookie, `${J}/content/vets/v1`)).status).toBe(200);
+    expect(jm.docs.vets.v1).toBeUndefined();
+    expect((await del(cookie, `${J}/content/videos/w1`)).status).toBe(200);
+    expect((await del(cookie, `${J}/content/stories/s1`)).status).toBe(200);
+    const denied = await del(cookie, `${J}/content/lands/l1`);
     expect(denied.status).toBe(403);
-    const alert = await request(app)
-      .post('/api/v1/apps/jeevamitra/alerts/a1/status')
-      .set('Cookie', admin)
-      .set('X-CSRF-Token', CSRF)
-      .send({ active: false });
-    expect(alert.status).toBe(200);
-    expect(jm.alerts[0]!.isActive).toBe(false);
+    expect(jm.docs.lands.l1).toBeDefined();
+    expect(db.state.auditLogs.map((l) => l.action)).toEqual(
+      expect.arrayContaining(['JEEVAMITRA_VET_CREATED', 'JEEVAMITRA_VET_UPDATED', 'JEEVAMITRA_CONTENT_DELETED']),
+    );
+  });
 
+  it('manager edits crop safety cards in three languages, adds a crop, hides one, resets one', async () => {
+    const cookie = await signedIn({ 'jeevamitra-admin': ['manager'] });
+    const edit = await put(cookie, `${J}/crop-guides/cotton`, {
+      risk: { en: 'Updated risk', te: 'కొత్త ప్రమాదం', hi: '' }, reviewedBy: 'Dr Rao, SVVU', reviewedOn: '2026-11-01',
+    });
+    expect(edit.status).toBe(200);
+    expect(jm.crops.get('cotton')).toEqual({ id: 'cotton', risk: { en: 'Updated risk', te: 'కొత్త ప్రమాదం' }, reviewedBy: 'Dr Rao, SVVU', reviewedOn: '2026-11-01' });
+    expect((await put(cookie, `${J}/crop-guides/millet_new`, { emoji: '🌾' })).status).toBe(422);
+    expect((await put(cookie, `${J}/crop-guides/millet_new`, { name: { en: 'Foxtail millet' }, order: 50 })).status).toBe(200);
+    expect((await put(cookie, `${J}/crop-guides/paddy`, { hidden: true })).status).toBe(200);
+    expect((await put(cookie, `${J}/crop-guides/paddy`, { hidden: true, script: '<x>' })).status).toBe(422);
+    expect((await put(cookie, `${J}/crop-guides/Bad Id`, { hidden: true })).status).toBe(422);
+    expect((await del(cookie, `${J}/crop-guides/cotton`)).status).toBe(200);
+    expect(jm.crops.has('cotton')).toBe(false);
+    expect((await del(cookie, `${J}/crop-guides/cotton`)).status).toBe(404);
+    const settings = await put(cookie, `${J}/crop-guide-settings`, { sprayWarningDays: 30, callVet: { en: 'Call 1962' } });
+    expect(settings.status).toBe(200);
+    expect(jm.settings).toEqual({ sprayWarningDays: 30, callVet: { en: 'Call 1962' } });
+    expect((await put(cookie, `${J}/crop-guide-settings`, { sprayWarningDays: 999 })).status).toBe(422);
+    expect(db.state.auditLogs.at(-1)).toMatchObject({ action: 'JEEVAMITRA_CROP_SETTINGS_SAVED' });
+  });
+
+  it('only super_admin deletes user posts and disables / enables accounts', async () => {
+    const manager = await signedIn({ 'jeevamitra-admin': ['manager'] });
+    expect((await post(manager, `${J}/users/f1/account`, { disabled: true })).status).toBe(403);
     const superAdmin = await signedIn({ 'jeevamitra-admin': ['super_admin'] });
-    const ok = await request(app)
-      .post('/api/v1/apps/jeevamitra/users/f1/account')
-      .set('Cookie', superAdmin)
-      .set('X-CSRF-Token', CSRF)
-      .send({ disabled: true });
-    expect(ok.status).toBe(200);
-    expect(jm.disabled.has('f1')).toBe(true);
+    const off = await post(superAdmin, `${J}/users/f1/account`, { disabled: true });
+    expect(off.status).toBe(200);
+    expect(jm.users[0]!.disabled).toBe(true);
+    expect(db.state.auditLogs.at(-1)).toMatchObject({ action: 'JEEVAMITRA_ACCOUNT_DISABLED', targetId: 'f1' });
+    const on = await post(superAdmin, `${J}/users/h1/account`, { disabled: false });
+    expect(on.status).toBe(200);
+    expect(jm.users[1]!.disabled).toBe(false);
+    expect(db.state.auditLogs.at(-1)).toMatchObject({ action: 'JEEVAMITRA_ACCOUNT_ENABLED', targetId: 'h1' });
+    expect((await post(superAdmin, `${J}/users/gone/account`, { disabled: true })).status).toBe(409);
+    expect((await post(superAdmin, `${J}/users/nobody/account`, { disabled: true })).status).toBe(404);
+    const removed = await del(superAdmin, `${J}/content/fieldPosts/p1`);
+    expect(removed.status).toBe(200);
+    expect(removed.body.data).toMatchObject({ deleted: true, filesDeleted: 2 });
+    expect(jm.docs.fieldPosts.p1).toBeUndefined();
+    expect((await del(superAdmin, `${J}/content/lands/l1`)).status).toBe(200);
   });
 });
 
